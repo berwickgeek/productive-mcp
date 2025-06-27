@@ -1,0 +1,477 @@
+# Productive.io MCP Server Development Documentation
+# FORMAT: YAML structured for AI consumption
+# VERSION: 1.0.0
+
+PROJECT_META:
+  PURPOSE: MCP server for Productive.io API integration
+  PROTOCOL: Model Context Protocol (MCP)
+  TARGET_CLIENT: Claude Desktop
+  TRANSPORT: stdio (JSON-RPC over stdout/stdin)
+  HIERARCHY: Customers → Projects → Boards → Task Lists → Tasks
+
+API_CONFIG:
+  BASE_URL: https://api.productive.io/api/v2/
+  FORMAT: JSON API specification
+  DOCUMENTATION: https://developer.productive.io/
+  
+  RATE_LIMITS:
+    - LIMIT: 100 requests per 10 seconds
+    - LIMIT: 4000 requests per 30 minutes
+    - LIMIT: 10 requests per 30 seconds (reports endpoint)
+  
+  AUTHENTICATION:
+    HEADERS:
+      - X-Auth-Token: YOUR_API_TOKEN
+      - X-Organization-Id: YOUR_ORG_ID
+      - Content-Type: application/vnd.api+json
+    
+    CREDENTIALS_SOURCE:
+      - ACTION: Log in to Productive.io
+      - ACTION: Navigate to Settings → API integrations
+      - ACTION: Generate new token (read-only or read/write)
+      - ACTION: Copy token and organization ID
+
+MCP_PROTOCOL_CONSTRAINTS:
+  CRITICAL_STDIO_RULES:
+    - RULE: stdout RESERVED EXCLUSIVELY for JSON-RPC messages
+    - RULE: ANY non-protocol stdout output BREAKS connection
+    - RULE: ALL debug/log/error output MUST use stderr
+    - RULE: Messages are newline-delimited JSON
+    - RULE: Each message on single line (no JSON internal newlines)
+
+TECH_STACK:
+  LANGUAGE: TypeScript/Node.js
+  DEPENDENCIES:
+    - PACKAGE: "@modelcontextprotocol/sdk"
+    - PACKAGE: "zod"
+    - PACKAGE: "dotenv"
+    - PACKAGE: "typescript" (dev)
+    - PACKAGE: "@types/node" (dev)
+  HTTP_CLIENT: fetch API or axios
+  BUILD_TOOL: TypeScript compiler
+
+PROJECT_STRUCTURE:
+  ROOT_DIR: productive-mcp/
+  DIRECTORIES:
+    - PATH: src/index.ts
+      PURPOSE: Server entry point
+    - PATH: src/server.ts
+      PURPOSE: MCP server setup
+    - PATH: src/tools/
+      PURPOSE: Tool implementations directory
+    - PATH: src/tools/companies.ts
+      PURPOSE: Company listing tool
+    - PATH: src/tools/projects.ts
+      PURPOSE: Project listing tool
+    - PATH: src/tools/tasks.ts
+      PURPOSE: Task operations (list, get, create)
+    - PATH: src/tools/boards.ts
+      PURPOSE: Board operations (list, create)
+    - PATH: src/tools/task-lists.ts
+      PURPOSE: Task list operations (list, create)
+    - PATH: src/tools/my-tasks.ts
+      PURPOSE: User-specific tasks tool
+    - PATH: src/tools/people.ts
+      PURPOSE: People/user operations (list, get by project)
+    - PATH: src/tools/whoami.ts
+      PURPOSE: Display current user context
+    - PATH: src/api/client.ts
+      PURPOSE: Productive API client class
+    - PATH: src/api/types.ts
+      PURPOSE: TypeScript type definitions
+    - PATH: src/config/index.ts
+      PURPOSE: Configuration management
+
+API_ENDPOINTS:
+  PROJECTS:
+    ENDPOINT: GET /api/v2/projects
+    FILTERS:
+      - NAME: filter[status]
+        VALUES: ["active", "archived"]
+        TYPE: string
+      - NAME: filter[project_type_id]
+        TYPE: string
+      - NAME: filter[company_id]
+        TYPE: integer
+        FORMAT: plain integer (NOT array notation)
+        EXAMPLE_CORRECT: "filter[company_id]=793189"
+        EXAMPLE_WRONG: "filter[company_id]=[793189]"
+    SORT_OPTIONS: ["name", "created_at", "updated_at"]
+    PAGINATION:
+      - PARAM: page[number]
+      - PARAM: page[size] (max 200)
+  
+  TASKS:
+    ENDPOINT: GET /api/v2/tasks
+    CREATE_ENDPOINT: POST /api/v2/tasks
+    UPDATE_ENDPOINT: PATCH /api/v2/tasks/{id}
+    FILTERS:
+      - NAME: filter[project_id]
+        TYPE: string
+      - NAME: filter[assignee_id]
+        TYPE: string
+        DESCRIPTION: Person ID from People endpoint
+      - NAME: filter[status]
+        TYPE: integer
+        VALUES:
+          - VALUE: 1
+            MEANING: open
+          - VALUE: 2
+            MEANING: closed
+        EXAMPLE_CORRECT: "filter[status]=1"
+        EXAMPLE_WRONG: "filter[status]=open"
+      - NAME: filter[due_date]
+        TYPE: date string
+    SORT_OPTIONS: ["title", "created_at", "due_date"]
+    PAGINATION:
+      - PARAM: page[number]
+      - PARAM: page[size] (max 200)
+  
+  BOARDS:
+    ENDPOINT: GET /api/v2/boards
+    CREATE_ENDPOINT: POST /api/v2/boards
+    FILTERS:
+      - NAME: filter[project_id]
+        TYPE: string
+        DESCRIPTION: Filter boards by project
+    PAGINATION:
+      - PARAM: page[number]
+      - PARAM: page[size] (max 200)
+  
+  TASK_LISTS:
+    ENDPOINT: GET /api/v2/task_lists
+    CREATE_ENDPOINT: POST /api/v2/task_lists
+    FILTERS:
+      - NAME: filter[board_id]
+        TYPE: string
+        DESCRIPTION: Filter task lists by board
+    PAGINATION:
+      - PARAM: page[number]
+      - PARAM: page[size] (max 200)
+  
+  PEOPLE:
+    ENDPOINT: GET /api/v2/people
+    FILTERS:
+      - NAME: filter[company_id]
+        TYPE: string
+        DESCRIPTION: Filter people by company
+      - NAME: filter[project_id]
+        TYPE: string
+        DESCRIPTION: Filter people assigned to project
+      - NAME: filter[is_active]
+        TYPE: boolean
+        DESCRIPTION: Filter by active status
+      - NAME: filter[email]
+        TYPE: string
+        DESCRIPTION: Filter by email address
+    PAGINATION:
+      - PARAM: page[number]
+      - PARAM: page[size] (max 100)
+
+STATUS_MAPPINGS:
+  TASKS:
+    - INPUT: "open"
+      OUTPUT: 1
+    - INPUT: "closed"
+      OUTPUT: 2
+  PROJECTS:
+    - VALUES: ["active", "archived"]
+      TYPE: string
+  COMPANIES:
+    - VALUES: ["active", "archived"]
+      TYPE: string
+
+IMPLEMENTED_TOOLS:
+  - TOOL: list_companies
+    PURPOSE: Get list of companies/customers
+    PARAMETERS:
+      - NAME: status
+        TYPE: string
+        VALUES: ["active", "archived"]
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        REQUIRED: false
+  
+  - TOOL: list_projects
+    PURPOSE: Get list of projects
+    PARAMETERS:
+      - NAME: status
+        TYPE: string
+        VALUES: ["active", "archived"]
+        REQUIRED: false
+      - NAME: company_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        REQUIRED: false
+  
+  - TOOL: list_tasks
+    PURPOSE: Get list of tasks
+    PARAMETERS:
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: assignee_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: status
+        TYPE: string
+        VALUES: ["open", "closed"]
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        REQUIRED: false
+  
+  - TOOL: get_project_tasks
+    PURPOSE: Get all tasks for specific project
+    PARAMETERS:
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: status
+        TYPE: string
+        VALUES: ["open", "closed"]
+        REQUIRED: false
+  
+  - TOOL: my_tasks
+    PURPOSE: Get tasks assigned to current user
+    DEPENDENCIES: PRODUCTIVE_USER_ID environment variable
+    PARAMETERS:
+      - NAME: status
+        TYPE: string
+        VALUES: ["open", "closed"]
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        REQUIRED: false
+  
+  - TOOL: list_boards
+    PURPOSE: Get list of boards
+    PARAMETERS:
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        REQUIRED: false
+  
+  - TOOL: create_board
+    PURPOSE: Create new board in project
+    PARAMETERS:
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: name
+        TYPE: string
+        REQUIRED: true
+      - NAME: description
+        TYPE: string
+        REQUIRED: false
+  
+  - TOOL: list_task_lists
+    PURPOSE: Get list of task lists
+    PARAMETERS:
+      - NAME: board_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        REQUIRED: false
+  
+  - TOOL: create_task_list
+    PURPOSE: Create new task list in board
+    PARAMETERS:
+      - NAME: board_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: name
+        TYPE: string
+        REQUIRED: true
+      - NAME: description
+        TYPE: string
+        REQUIRED: false
+  
+  - TOOL: create_task
+    PURPOSE: Create new task
+    SPECIAL_BEHAVIOR: assignee_id accepts "me" to refer to configured user
+    PARAMETERS:
+      - NAME: title
+        TYPE: string
+        REQUIRED: true
+      - NAME: description
+        TYPE: string
+        REQUIRED: false
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: board_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: task_list_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: assignee_id
+        TYPE: string
+        SPECIAL_VALUES: ["me"]
+        REQUIRED: false
+      - NAME: due_date
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        REQUIRED: false
+      - NAME: status
+        TYPE: string
+        VALUES: ["open", "closed"]
+        DEFAULT: "open"
+        REQUIRED: false
+  
+  - TOOL: update_task_assignment
+    PURPOSE: Update assignee of existing task
+    SPECIAL_BEHAVIOR: assignee_id accepts "me" to refer to configured user, "null" string to unassign
+    PARAMETERS:
+      - NAME: task_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: assignee_id
+        TYPE: string
+        SPECIAL_VALUES: ["me", "null"]
+        REQUIRED: true
+  
+  - TOOL: list_people
+    PURPOSE: List people/users in organization
+    PARAMETERS:
+      - NAME: company_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: is_active
+        TYPE: boolean
+        REQUIRED: false
+      - NAME: email
+        TYPE: string
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 50
+        MAX: 100
+        REQUIRED: false
+      - NAME: page
+        TYPE: number
+        DEFAULT: 1
+        REQUIRED: false
+  
+  - TOOL: get_project_people
+    PURPOSE: Get people assigned to specific project
+    PARAMETERS:
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: is_active
+        TYPE: boolean
+        DEFAULT: true
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 50
+        MAX: 100
+        REQUIRED: false
+      - NAME: page
+        TYPE: number
+        DEFAULT: 1
+        REQUIRED: false
+  
+  - TOOL: whoami
+    PURPOSE: Display current user context
+    DESCRIPTION: Shows which user ID is configured as "me"
+    DEPENDENCIES: PRODUCTIVE_USER_ID environment variable
+    PARAMETERS: none
+
+ENVIRONMENT_VARIABLES:
+  - NAME: PRODUCTIVE_API_TOKEN
+    PURPOSE: API authentication token
+    REQUIRED: true
+  - NAME: PRODUCTIVE_ORG_ID
+    PURPOSE: Organization identifier
+    REQUIRED: true
+  - NAME: PRODUCTIVE_USER_ID
+    PURPOSE: Current user context for "me" references
+    USAGE: When set, tools accept "me" as assignee_id value
+    AFFECTED_TOOLS: ["my_tasks", "create_task", "update_task_assignment", "whoami"]
+    REQUIRED: false
+
+API_GOTCHAS:
+  - ISSUE: Company ID filter format
+    PROBLEM: API expects plain integer, not array notation
+    SOLUTION: Use filter[company_id]=123 NOT filter[company_id]=[123]
+  
+  - ISSUE: Task status type mismatch
+    PROBLEM: API expects integer but tool accepts string
+    SOLUTION: Map "open"->1, "closed"->2 before API call
+    ERROR_MESSAGE: "Unsupported value 'active' for filter 'status' on this endpoint. Expected a value of type 'Integer'"
+  
+  - ISSUE: No current user endpoint
+    PROBLEM: No /me or /current_user endpoint exists
+    SOLUTION: Store PRODUCTIVE_USER_ID in environment
+  
+  - ISSUE: Dotenv stdout pollution
+    PROBLEM: dotenv outputs debug info to stdout
+    SOLUTION: Temporarily override stdout.write during dotenv.config()
+  
+  - ISSUE: Task list creation error "can't be blank"
+    PROBLEM: POST /api/v2/task_lists returns "can't be blank" error
+    OBSERVATION: Boards may auto-create a default task list named "New list"
+    STATUS: Under investigation - check Productive API docs for task_lists endpoint requirements
+  
+  - ISSUE: MCP schema type array freezing
+    PROBLEM: type: ["string", "null"] in JSON schema causes Claude to freeze
+    SOLUTION: Use type: "string" and handle "null" as string value
+    AFFECTED_TOOL: update_task_assignment
+  
+  - ISSUE: User context not understood by Claude
+    PROBLEM: Claude doesn't automatically understand "me" refers to configured user
+    SOLUTION: Added whoami tool and explicit instructions in server description
+    IMPLEMENTATION: Server description includes "use 'me' as assignee_id" instruction
+
+SECURITY_REQUIREMENTS:
+  - RULE: Never commit API tokens to version control
+  - RULE: Use .env files for local development
+  - RULE: Use read-only tokens when possible
+  - RULE: Never expose sensitive data in error messages
+
+DEVELOPMENT_WORKFLOW:
+  - STEP: npm install dependencies
+  - STEP: Configure TypeScript (tsconfig.json)
+  - STEP: Implement API client with type safety
+  - STEP: Create MCP tools with Zod validation
+  - STEP: Test locally with node build/index.js
+  - STEP: Configure Claude Desktop config.json
+
+FUTURE_ENHANCEMENTS:
+  - FEATURE: Time tracking operations
+  - FEATURE: Project creation
+  - FEATURE: Update task fields beyond assignee (title, description, due date)
+  - FEATURE: Delete operations (tasks, boards, task lists)
+  - FEATURE: Comments on tasks
+  - FEATURE: Resource exposure for files/attachments
+  - FEATURE: Response caching
+  - FEATURE: Webhook support for real-time updates
+  - FEATURE: Bulk operations (assign multiple tasks at once)
+  - FEATURE: Search across all entities
+
+COMPLETED_FEATURES:
+  - FEATURE: Create tasks (implemented)
+  - FEATURE: Update task assignment (implemented)
+  - FEATURE: List people/users (implemented)
+  - FEATURE: Get project people (implemented)
+  - FEATURE: User context with "me" support (implemented)
+  - FEATURE: Create boards (implemented)
+  - FEATURE: Create task lists (partially - has API issues)

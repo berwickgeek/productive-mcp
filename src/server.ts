@@ -1,0 +1,113 @@
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { getConfig } from './config/index.js';
+import { ProductiveAPIClient } from './api/client.js';
+import { listProjectsTool, listProjectsDefinition } from './tools/projects.js';
+import { listTasksTool, getProjectTasksTool, createTaskTool, updateTaskAssignmentTool, listTasksDefinition, getProjectTasksDefinition, createTaskDefinition, updateTaskAssignmentDefinition } from './tools/tasks.js';
+import { listCompaniesTool, listCompaniesDefinition } from './tools/companies.js';
+import { myTasksTool, myTasksDefinition } from './tools/my-tasks.js';
+import { listBoards, createBoard, listBoardsTool, createBoardTool } from './tools/boards.js';
+import { listTaskLists, createTaskList, listTaskListsTool, createTaskListTool } from './tools/task-lists.js';
+import { listPeople, getProjectPeople, listPeopleTool, getProjectPeopleTool } from './tools/people.js';
+import { whoAmI, whoAmITool } from './tools/whoami.js';
+
+export async function createServer() {
+  // Initialize API client and config early to check user context
+  const config = getConfig();
+  const hasConfiguredUser = !!config.PRODUCTIVE_USER_ID;
+  
+  const server = new Server(
+    {
+      name: 'productive-mcp',
+      version: '1.0.0',
+      description: `MCP server for Productive.io API integration. Productive has a hierarchical structure: Customers → Projects → Boards → Task Lists → Tasks.${hasConfiguredUser ? ` IMPORTANT: When users say "me" or "assign to me", use "me" as the assignee_id value - it automatically resolves to the configured user ID ${config.PRODUCTIVE_USER_ID}.` : ' No user configured - set PRODUCTIVE_USER_ID to enable "me" context.'} Use the 'whoami' tool to check current user context.`,
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
+  const apiClient = new ProductiveAPIClient(config);
+  
+  // Register handlers
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      whoAmITool,
+      listCompaniesDefinition,
+      listProjectsDefinition,
+      listBoardsTool,
+      createBoardTool,
+      listTaskListsTool,
+      createTaskListTool,
+      listTasksDefinition,
+      getProjectTasksDefinition,
+      createTaskDefinition,
+      updateTaskAssignmentDefinition,
+      myTasksDefinition,
+      listPeopleTool,
+      getProjectPeopleTool,
+    ],
+  }));
+  
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    
+    switch (name) {
+      case 'whoami':
+        return await whoAmI(apiClient, args, config);
+        
+      case 'list_companies':
+        return await listCompaniesTool(apiClient, args);
+        
+      case 'list_projects':
+        return await listProjectsTool(apiClient, args);
+        
+      case 'list_tasks':
+        return await listTasksTool(apiClient, args);
+        
+      case 'get_project_tasks':
+        return await getProjectTasksTool(apiClient, args);
+        
+      case 'my_tasks':
+        return await myTasksTool(apiClient, config, args);
+        
+      case 'list_boards':
+        return await listBoards(apiClient, args);
+        
+      case 'create_board':
+        return await createBoard(apiClient, args);
+        
+      case 'create_task':
+        return await createTaskTool(apiClient, args, config);
+        
+      case 'update_task_assignment':
+        return await updateTaskAssignmentTool(apiClient, args, config);
+        
+      case 'list_task_lists':
+        return await listTaskLists(apiClient, args);
+        
+      case 'create_task_list':
+        return await createTaskList(apiClient, args);
+        
+      case 'list_people':
+        return await listPeople(apiClient, args);
+        
+      case 'get_project_people':
+        return await getProjectPeople(apiClient, args);
+        
+      default:
+        throw new Error(`Unknown tool: ${name}`);
+    }
+  });
+  
+  // Connect to stdio transport
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  
+  // Don't output anything to stdout/stderr after connecting
+  // as it can interfere with the MCP protocol
+  
+  return server;
+}
