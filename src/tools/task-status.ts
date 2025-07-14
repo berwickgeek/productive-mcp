@@ -5,10 +5,7 @@ import { ProductiveTaskUpdate } from '../api/types.js';
 
 const updateTaskStatusSchema = z.object({
   task_id: z.string().min(1, 'Task ID is required'),
-  status: z.union([
-    z.enum(['open', 'closed']),
-    z.number().int().min(1),
-  ]).describe('Task status: "open" (1), "closed" (2), or a custom status number'),
+  workflow_status_id: z.string().min(1, 'Workflow status ID is required'),
 });
 
 export async function updateTaskStatusTool(
@@ -18,20 +15,17 @@ export async function updateTaskStatusTool(
   try {
     const params = updateTaskStatusSchema.parse(args);
     
-    // Convert status to number if it's a string
-    let statusValue: number;
-    if (typeof params.status === 'string') {
-      statusValue = params.status === 'open' ? 1 : 2;
-    } else {
-      statusValue = params.status;
-    }
-    
     const taskUpdate: ProductiveTaskUpdate = {
       data: {
         type: 'tasks',
         id: params.task_id,
-        attributes: {
-          status: statusValue,
+        relationships: {
+          workflow_status: {
+            data: {
+              id: params.workflow_status_id,
+              type: 'workflow_statuses',
+            },
+          },
         },
       },
     };
@@ -40,23 +34,13 @@ export async function updateTaskStatusTool(
     
     let text = `Task status updated successfully!\n`;
     text += `Task: ${response.data.attributes.title} (ID: ${response.data.id})\n`;
+    text += `Workflow Status ID: ${params.workflow_status_id}`;
     
-    // Check both possible status fields in the response
-    let actualStatus: string;
+    // Check for status information in the response
     if (response.data.attributes.closed !== undefined) {
-      // Single task response format uses 'closed' boolean
-      actualStatus = response.data.attributes.closed ? 'closed' : 'open';
-    } else if (response.data.attributes.status !== undefined) {
-      // List response format uses 'status' integer
-      actualStatus = response.data.attributes.status === 1 ? 'open' : 
-                    response.data.attributes.status === 2 ? 'closed' : 
-                    `status ${response.data.attributes.status}`;
-    } else {
-      // Fallback to what we sent
-      actualStatus = statusValue === 1 ? 'open' : statusValue === 2 ? 'closed' : `status ${statusValue}`;
+      const statusText = response.data.attributes.closed ? 'closed' : 'open';
+      text += `\nActual Status: ${statusText}`;
     }
-    
-    text += `New status: ${actualStatus}`;
     
     if (response.data.attributes.updated_at) {
       text += `\nUpdated at: ${response.data.attributes.updated_at}`;
@@ -85,7 +69,7 @@ export async function updateTaskStatusTool(
 
 export const updateTaskStatusDefinition = {
   name: 'update_task_status',
-  description: 'Update the status of a task in Productive.io. Use "open" (1) or "closed" (2) for standard statuses, or provide a custom status number.',
+  description: 'Update the status of a task in Productive.io using workflow status ID. Use list_workflow_statuses to see available status IDs.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -93,22 +77,11 @@ export const updateTaskStatusDefinition = {
         type: 'string',
         description: 'ID of the task to update (required)',
       },
-      status: {
-        oneOf: [
-          {
-            type: 'string',
-            enum: ['open', 'closed'],
-            description: 'Standard status: "open" or "closed"',
-          },
-          {
-            type: 'number',
-            description: 'Custom status number (1=open, 2=closed, or custom workflow status)',
-            minimum: 1,
-          },
-        ],
-        description: 'Task status to set',
+      workflow_status_id: {
+        type: 'string',
+        description: 'ID of the workflow status to set (use list_workflow_statuses to see available options)',
       },
     },
-    required: ['task_id', 'status'],
+    required: ['task_id', 'workflow_status_id'],
   },
 };

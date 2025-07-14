@@ -8,6 +8,7 @@ import {
   ProductivePerson,
   ProductiveActivity,
   ProductiveComment,
+  ProductiveWorkflowStatus,
   ProductiveResponse, 
   ProductiveSingleResponse,
   ProductiveTaskCreate,
@@ -337,5 +338,35 @@ export class ProductiveAPIClient {
       method: 'POST',
       body: JSON.stringify(commentData),
     });
+  }
+
+  async listWorkflowStatuses(params?: {
+    workflow_id?: string;
+    category_id?: number;
+    limit?: number;
+    page?: number;
+  }): Promise<ProductiveResponse<ProductiveWorkflowStatus>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params?.workflow_id) {
+      queryParams.append('filter[workflow_id]', params.workflow_id);
+    }
+    
+    if (params?.category_id) {
+      queryParams.append('filter[category_id]', params.category_id.toString());
+    }
+    
+    if (params?.limit) {
+      queryParams.append('page[size]', params.limit.toString());
+    }
+    
+    if (params?.page) {
+      queryParams.append('page[number]', params.page.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const path = `workflow_statuses${queryString ? `?${queryString}` : ''}`;
+    
+    return this.makeRequest<ProductiveResponse<ProductiveWorkflowStatus>>(path);
   }
 }

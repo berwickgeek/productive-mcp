@@ -15,6 +15,7 @@ import { listActivities, listActivitiesTool } from './tools/activities.js';
 import { getRecentUpdates, getRecentUpdatesTool } from './tools/recent-updates.js';
 import { addTaskCommentTool, addTaskCommentDefinition } from './tools/comments.js';
 import { updateTaskStatusTool, updateTaskStatusDefinition } from './tools/task-status.js';
+import { listWorkflowStatusesTool, listWorkflowStatusesDefinition } from './tools/workflow-statuses.js';
 
 export async function createServer() {
   // Initialize API client and config early to check user context
@@ -52,6 +53,7 @@ export async function createServer() {
       updateTaskAssignmentDefinition,
       addTaskCommentDefinition,
       updateTaskStatusDefinition,
+      listWorkflowStatusesDefinition,
       myTasksDefinition,
       listPeopleTool,
       getProjectPeopleTool,
@@ -102,6 +104,9 @@ export async function createServer() {
         
       case 'update_task_status':
         return await updateTaskStatusTool(apiClient, args);
+        
+      case 'list_workflow_statuses':
+        return await listWorkflowStatusesTool(apiClient, args);
         
       case 'list_task_lists':
         return await listTaskLists(apiClient, args);

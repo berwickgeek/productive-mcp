@@ -223,6 +223,12 @@ export interface ProductiveTaskUpdate {
           type: 'people';
         } | null;
       };
+      workflow_status?: {
+        data: {
+          id: string;
+          type: 'workflow_statuses';
+        };
+      };
     };
   };
 }
@@ -333,6 +339,29 @@ export interface ProductiveCommentCreate {
         };
       };
     };
+  };
+}
+
+export interface ProductiveWorkflowStatus {
+  id: string;
+  type: 'workflow_statuses';
+  attributes: {
+    name: string;
+    color_id: number;
+    position: number;
+    category_id: number; // 1=not started, 2=started, 3=closed
+    created_at: string;
+    updated_at: string;
+    [key: string]: any;
+  };
+  relationships?: {
+    workflow?: {
+      data: {
+        id: string;
+        type: 'workflows';
+      };
+    };
+    [key: string]: any;
   };
 }
 
