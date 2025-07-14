@@ -7,12 +7,14 @@ import {
   ProductiveTaskList,
   ProductivePerson,
   ProductiveActivity,
+  ProductiveComment,
   ProductiveResponse, 
   ProductiveSingleResponse,
   ProductiveTaskCreate,
   ProductiveTaskUpdate,
   ProductiveBoardCreate,
   ProductiveTaskListCreate,
+  ProductiveCommentCreate,
   ProductiveError 
 } from './types.js';
 
@@ -264,6 +266,10 @@ export class ProductiveAPIClient {
     return this.makeRequest<ProductiveResponse<ProductivePerson>>(path);
   }
   
+  async getTask(taskId: string): Promise<ProductiveSingleResponse<ProductiveTask>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveTask>>(`tasks/${taskId}`);
+  }
+
   async updateTask(taskId: string, taskData: ProductiveTaskUpdate): Promise<ProductiveSingleResponse<ProductiveTask>> {
     return this.makeRequest<ProductiveSingleResponse<ProductiveTask>>(`tasks/${taskId}`, {
       method: 'PATCH',
@@ -324,5 +330,12 @@ export class ProductiveAPIClient {
     const path = `activities${queryString ? `?${queryString}` : ''}`;
     
     return this.makeRequest<ProductiveResponse<ProductiveActivity>>(path);
+  }
+
+  async createComment(commentData: ProductiveCommentCreate): Promise<ProductiveSingleResponse<ProductiveComment>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveComment>>('comments', {
+      method: 'POST',
+      body: JSON.stringify(commentData),
+    });
   }
 }

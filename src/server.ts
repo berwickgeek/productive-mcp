@@ -4,7 +4,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { getConfig } from './config/index.js';
 import { ProductiveAPIClient } from './api/client.js';
 import { listProjectsTool, listProjectsDefinition } from './tools/projects.js';
-import { listTasksTool, getProjectTasksTool, createTaskTool, updateTaskAssignmentTool, listTasksDefinition, getProjectTasksDefinition, createTaskDefinition, updateTaskAssignmentDefinition } from './tools/tasks.js';
+import { listTasksTool, getProjectTasksTool, getTaskTool, createTaskTool, updateTaskAssignmentTool, listTasksDefinition, getProjectTasksDefinition, getTaskDefinition, createTaskDefinition, updateTaskAssignmentDefinition } from './tools/tasks.js';
 import { listCompaniesTool, listCompaniesDefinition } from './tools/companies.js';
 import { myTasksTool, myTasksDefinition } from './tools/my-tasks.js';
 import { listBoards, createBoard, listBoardsTool, createBoardTool } from './tools/boards.js';
@@ -13,6 +13,8 @@ import { listPeople, getProjectPeople, listPeopleTool, getProjectPeopleTool } fr
 import { whoAmI, whoAmITool } from './tools/whoami.js';
 import { listActivities, listActivitiesTool } from './tools/activities.js';
 import { getRecentUpdates, getRecentUpdatesTool } from './tools/recent-updates.js';
+import { addTaskCommentTool, addTaskCommentDefinition } from './tools/comments.js';
+import { updateTaskStatusTool, updateTaskStatusDefinition } from './tools/task-status.js';
 
 export async function createServer() {
   // Initialize API client and config early to check user context
@@ -45,8 +47,11 @@ export async function createServer() {
       createTaskListTool,
       listTasksDefinition,
       getProjectTasksDefinition,
+      getTaskDefinition,
       createTaskDefinition,
       updateTaskAssignmentDefinition,
+      addTaskCommentDefinition,
+      updateTaskStatusDefinition,
       myTasksDefinition,
       listPeopleTool,
       getProjectPeopleTool,
@@ -74,6 +79,9 @@ export async function createServer() {
       case 'get_project_tasks':
         return await getProjectTasksTool(apiClient, args);
         
+      case 'get_task':
+        return await getTaskTool(apiClient, args);
+        
       case 'my_tasks':
         return await myTasksTool(apiClient, config, args);
         
@@ -88,6 +96,12 @@ export async function createServer() {
         
       case 'update_task_assignment':
         return await updateTaskAssignmentTool(apiClient, args, config);
+        
+      case 'add_task_comment':
+        return await addTaskCommentTool(apiClient, args);
+        
+      case 'update_task_status':
+        return await updateTaskStatusTool(apiClient, args);
         
       case 'list_task_lists':
         return await listTaskLists(apiClient, args);

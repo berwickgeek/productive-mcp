@@ -15,6 +15,10 @@ const getProjectTasksSchema = z.object({
   status: z.enum(['open', 'closed']).optional(),
 });
 
+const getTaskSchema = z.object({
+  task_id: z.string().min(1, 'Task ID is required'),
+});
+
 export async function listTasksTool(
   client: ProductiveAPIClient,
   args: unknown
@@ -128,6 +132,106 @@ export async function getProjectTasksTool(
   }
 }
 
+export async function getTaskTool(
+  client: ProductiveAPIClient,
+  args: unknown
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  try {
+    const params = getTaskSchema.parse(args);
+    
+    const response = await client.getTask(params.task_id);
+    
+    const task = response.data;
+    const projectId = task.relationships?.project?.data?.id;
+    const assigneeId = task.relationships?.assignee?.data?.id;
+    
+    // Handle status using the 'closed' field from actual API response
+    const statusText = task.attributes.closed === false ? 'open' : task.attributes.closed === true ? 'closed' : 'unknown';
+    
+    let text = `Task Details:\n\n`;
+    text += `Title: ${task.attributes.title}\n`;
+    text += `ID: ${task.id}\n`;
+    text += `Status: ${statusText}\n`;
+    
+    if (task.attributes.description) {
+      text += `Description: ${task.attributes.description}\n`;
+    }
+    
+    if (task.attributes.due_date) {
+      text += `Due Date: ${task.attributes.due_date}\n`;
+    } else {
+      text += `Due Date: No due date set\n`;
+    }
+    
+    if (projectId) {
+      text += `Project ID: ${projectId}\n`;
+    }
+    
+    if (assigneeId) {
+      text += `Assignee ID: ${assigneeId}\n`;
+    } else {
+      text += `Assignee: Unassigned\n`;
+    }
+    
+    if (task.attributes.created_at) {
+      text += `Created: ${task.attributes.created_at}\n`;
+    }
+    
+    if (task.attributes.updated_at) {
+      text += `Updated: ${task.attributes.updated_at}\n`;
+    }
+    
+    // Include any additional attributes that might be useful
+    if (task.attributes.priority !== undefined) {
+      text += `Priority: ${task.attributes.priority}\n`;
+    }
+    
+    if (task.attributes.placement !== undefined) {
+      text += `Position: ${task.attributes.placement}\n`;
+    }
+    
+    // Add useful additional fields from actual API response
+    if (task.attributes.task_number) {
+      text += `Task Number: ${task.attributes.task_number}\n`;
+    }
+    
+    if (task.attributes.private !== undefined) {
+      text += `Private: ${task.attributes.private ? 'Yes' : 'No'}\n`;
+    }
+    
+    if (task.attributes.initial_estimate) {
+      text += `Initial Estimate: ${task.attributes.initial_estimate}\n`;
+    }
+    
+    if (task.attributes.worked_time) {
+      text += `Worked Time: ${task.attributes.worked_time}\n`;
+    }
+    
+    if (task.attributes.last_activity_at) {
+      text += `Last Activity: ${task.attributes.last_activity_at}\n`;
+    }
+    
+    return {
+      content: [{
+        type: 'text',
+        text: text,
+      }],
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
+      );
+    }
+    
+    throw new McpError(
+      ErrorCode.InternalError,
+      error instanceof Error ? error.message : 'Unknown error occurred'
+    );
+  }
+}
+
 export const listTasksDefinition = {
   name: 'list_tasks',
   description: 'Get a list of tasks from Productive.io',
@@ -175,6 +279,21 @@ export const getProjectTasksDefinition = {
       },
     },
     required: ['project_id'],
+  },
+};
+
+export const getTaskDefinition = {
+  name: 'get_task',
+  description: 'Get detailed information about a specific task by ID',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      task_id: {
+        type: 'string',
+        description: 'The ID of the task to retrieve',
+      },
+    },
+    required: ['task_id'],
   },
 };
 

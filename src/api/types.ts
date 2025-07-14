@@ -47,7 +47,8 @@ export interface ProductiveTask {
   attributes: {
     title: string;
     description?: string;
-    status: number; // 1 = open, 2 = closed
+    status?: number; // 1 = open, 2 = closed (for API requests)
+    closed?: boolean; // false = open, true = closed (from API responses)
     due_date?: string;
     created_at: string;
     updated_at: string;
@@ -281,6 +282,57 @@ export interface ProductiveActivity {
       };
     };
     [key: string]: any;
+  };
+}
+
+export interface ProductiveComment {
+  id: string;
+  type: 'comments';
+  attributes: {
+    body: string;
+    commentable_type: string;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+    draft?: boolean;
+    edited_at?: string;
+    hidden?: boolean;
+    pinned_at?: string;
+    reactions?: Record<string, any>;
+    version_number?: number;
+    [key: string]: any;
+  };
+  relationships?: {
+    creator?: {
+      data: {
+        id: string;
+        type: 'people';
+      };
+    };
+    task?: {
+      data: {
+        id: string;
+        type: 'tasks';
+      };
+    };
+    [key: string]: any;
+  };
+}
+
+export interface ProductiveCommentCreate {
+  data: {
+    type: 'comments';
+    attributes: {
+      body: string;
+    };
+    relationships: {
+      task: {
+        data: {
+          id: string;
+          type: 'tasks';
+        };
+      };
+    };
   };
 }
 
