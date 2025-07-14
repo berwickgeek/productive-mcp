@@ -6,6 +6,7 @@ import {
   ProductiveBoard,
   ProductiveTaskList,
   ProductivePerson,
+  ProductiveActivity,
   ProductiveResponse, 
   ProductiveSingleResponse,
   ProductiveTaskCreate,
@@ -268,5 +269,60 @@ export class ProductiveAPIClient {
       method: 'PATCH',
       body: JSON.stringify(taskData),
     });
+  }
+
+  async listActivities(params?: {
+    task_id?: string;
+    project_id?: string;
+    person_id?: string;
+    item_type?: string;
+    event?: string;
+    after?: string; // ISO 8601 date string
+    before?: string; // ISO 8601 date string
+    limit?: number;
+    page?: number;
+  }): Promise<ProductiveResponse<ProductiveActivity>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params?.task_id) {
+      queryParams.append('filter[task_id]', params.task_id);
+    }
+    
+    if (params?.project_id) {
+      queryParams.append('filter[project_id]', params.project_id);
+    }
+    
+    if (params?.person_id) {
+      queryParams.append('filter[person_id]', params.person_id);
+    }
+    
+    if (params?.item_type) {
+      queryParams.append('filter[item_type]', params.item_type);
+    }
+    
+    if (params?.event) {
+      queryParams.append('filter[event]', params.event);
+    }
+    
+    if (params?.after) {
+      queryParams.append('filter[after]', params.after);
+    }
+    
+    if (params?.before) {
+      queryParams.append('filter[before]', params.before);
+    }
+    
+    if (params?.limit) {
+      queryParams.append('page[size]', params.limit.toString());
+    }
+    
+    if (params?.page) {
+      queryParams.append('page[number]', params.page.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const path = `activities${queryString ? `?${queryString}` : ''}`;
+    
+    return this.makeRequest<ProductiveResponse<ProductiveActivity>>(path);
   }
 }

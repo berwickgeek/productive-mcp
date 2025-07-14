@@ -256,6 +256,34 @@ export interface ProductivePerson {
   };
 }
 
+export interface ProductiveActivity {
+  id: string;
+  type: 'activities';
+  attributes: {
+    event: string; // 'create', 'update', 'delete', etc.
+    item_type: string; // 'Task', 'Project', 'Workspace', etc.
+    item_id: string;
+    changes?: Record<string, any>;
+    created_at: string;
+    [key: string]: any;
+  };
+  relationships?: {
+    organization?: {
+      data: {
+        id: string;
+        type: 'organizations';
+      };
+    };
+    creator?: {
+      data: {
+        id: string;
+        type: 'people';
+      };
+    };
+    [key: string]: any;
+  };
+}
+
 export interface ProductiveError {
   errors: Array<{
     status?: string;

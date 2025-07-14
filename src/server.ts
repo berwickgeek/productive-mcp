@@ -11,6 +11,8 @@ import { listBoards, createBoard, listBoardsTool, createBoardTool } from './tool
 import { listTaskLists, createTaskList, listTaskListsTool, createTaskListTool } from './tools/task-lists.js';
 import { listPeople, getProjectPeople, listPeopleTool, getProjectPeopleTool } from './tools/people.js';
 import { whoAmI, whoAmITool } from './tools/whoami.js';
+import { listActivities, listActivitiesTool } from './tools/activities.js';
+import { getRecentUpdates, getRecentUpdatesTool } from './tools/recent-updates.js';
 
 export async function createServer() {
   // Initialize API client and config early to check user context
@@ -48,6 +50,8 @@ export async function createServer() {
       myTasksDefinition,
       listPeopleTool,
       getProjectPeopleTool,
+      listActivitiesTool,
+      getRecentUpdatesTool,
     ],
   }));
   
@@ -96,6 +100,12 @@ export async function createServer() {
         
       case 'get_project_people':
         return await getProjectPeople(apiClient, args);
+        
+      case 'list_activities':
+        return await listActivities(apiClient, args);
+        
+      case 'get_recent_updates':
+        return await getRecentUpdates(apiClient, args);
         
       default:
         throw new Error(`Unknown tool: ${name}`);
