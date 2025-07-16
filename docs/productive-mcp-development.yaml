@@ -8,6 +8,7 @@ PROJECT_META:
   TARGET_CLIENT: Claude Desktop
   TRANSPORT: stdio (JSON-RPC over stdout/stdin)
   HIERARCHY: Customers → Projects → Boards → Task Lists → Tasks
+TIMESHEET_HIERARCHY: Projects → Deals/Budgets → Services → Tasks → Time Entries
 
 API_CONFIG:
   BASE_URL: https://api.productive.io/api/v2/
@@ -81,6 +82,72 @@ PROJECT_STRUCTURE:
       PURPOSE: TypeScript type definitions
     - PATH: src/config/index.ts
       PURPOSE: Configuration management
+
+API_ENDPOINTS:
+  TIME_ENTRIES:
+    ENDPOINT: GET /api/v2/time_entries
+    CREATE_ENDPOINT: POST /api/v2/time_entries
+    FILTERS:
+      - NAME: filter[date]
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        DESCRIPTION: Filter by specific date
+      - NAME: filter[after]
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        DESCRIPTION: Filter entries after date
+      - NAME: filter[before]
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        DESCRIPTION: Filter entries before date
+      - NAME: filter[person_id]
+        TYPE: string
+        DESCRIPTION: Filter by person ID
+      - NAME: filter[project_id]
+        TYPE: string
+        DESCRIPTION: Filter by project ID
+      - NAME: filter[task_id]
+        TYPE: string
+        DESCRIPTION: Filter by task ID
+      - NAME: filter[service_id]
+        TYPE: string
+        DESCRIPTION: Filter by service ID
+    PAGINATION:
+      - PARAM: page[number]
+      - PARAM: page[size] (max 200)
+    HIERARCHY_REQUIREMENT: Time entries must be linked to a service within a deal/budget
+    
+  DEALS:
+    ENDPOINT: GET /api/v2/deals
+    FILTERS:
+      - NAME: filter[project_id]
+        TYPE: string
+        DESCRIPTION: Filter deals by project
+      - NAME: filter[budget_type]
+        TYPE: integer
+        VALUES:
+          - VALUE: 1
+            MEANING: deal
+          - VALUE: 2
+            MEANING: budget
+    PAGINATION:
+      - PARAM: page[number]
+      - PARAM: page[size] (max 200)
+  
+  SERVICES:
+    ENDPOINT: GET /api/v2/services
+    HIERARCHY_ENDPOINT: GET /api/v2/services (filtered by deal relationship)
+    FILTERS:
+      - NAME: filter[company_id]
+        TYPE: string
+        DESCRIPTION: Filter by company ID
+      - NAME: filter[deal_id]
+        TYPE: string
+        DESCRIPTION: Filter services by deal (via relationships)
+    PAGINATION:
+      - PARAM: page[number]
+      - PARAM: page[size] (max 200)
+    NOTE: Services are linked to deals/budgets through relationships
 
 API_ENDPOINTS:
   PROJECTS:
@@ -169,6 +236,25 @@ API_ENDPOINTS:
       - PARAM: page[size] (max 100)
 
 STATUS_MAPPINGS:
+  TIME_ENTRY_TIME_PARSING:
+    - INPUT: "2h"
+      OUTPUT: 120 minutes
+    - INPUT: "120m"
+      OUTPUT: 120 minutes
+    - INPUT: "2.5h"
+      OUTPUT: 150 minutes
+    - INPUT: "2.5"
+      OUTPUT: 150 minutes (assumed hours)
+  
+  TIME_ENTRY_DATE_PARSING:
+    - INPUT: "today"
+      OUTPUT: Current date in YYYY-MM-DD format
+    - INPUT: "yesterday"
+      OUTPUT: Previous date in YYYY-MM-DD format
+    - INPUT: "2024-01-15"
+      OUTPUT: 2024-01-15 (YYYY-MM-DD format)
+
+STATUS_MAPPINGS:
   TASKS:
     - INPUT: "open"
       OUTPUT: 1
@@ -180,6 +266,145 @@ STATUS_MAPPINGS:
   COMPANIES:
     - VALUES: ["active", "archived"]
       TYPE: string
+
+IMPLEMENTED_TOOLS:
+  # TIMESHEET WORKFLOW TOOLS
+  - TOOL: list_time_entries
+    PURPOSE: View existing time entries with detailed service/budget relationships
+    WORKFLOW_STEP: View logged time
+    PARAMETERS:
+      - NAME: date
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        REQUIRED: false
+      - NAME: after
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        REQUIRED: false
+      - NAME: before
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        REQUIRED: false
+      - NAME: person_id
+        TYPE: string
+        SPECIAL_VALUES: ["me"]
+        REQUIRED: false
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: task_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: service_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        MAX: 200
+        REQUIRED: false
+  
+  - TOOL: create_time_entry
+    PURPOSE: Create time entry with detailed work description
+    WORKFLOW_STEP: "5 (FINAL) - Log time with service hierarchy validation"
+    CONFIRMATION_REQUIRED: true
+    PARAMETERS:
+      - NAME: date
+        TYPE: string
+        VALUES: ["today", "yesterday", "YYYY-MM-DD"]
+        REQUIRED: true
+      - NAME: time
+        TYPE: string
+        FORMAT: "2h", "120m", "2.5h", "2.5"
+        REQUIRED: true
+      - NAME: person_id
+        TYPE: string
+        SPECIAL_VALUES: ["me"]
+        REQUIRED: true
+      - NAME: service_id
+        TYPE: string
+        DESCRIPTION: Must be from deal/budget service hierarchy
+        REQUIRED: true
+      - NAME: task_id
+        TYPE: string
+        DESCRIPTION: Optional but recommended for better tracking
+        REQUIRED: false
+      - NAME: note
+        TYPE: string
+        MIN_LENGTH: 10
+        DESCRIPTION: Detailed work description required
+        REQUIRED: true
+      - NAME: billable_time
+        TYPE: string
+        FORMAT: Same as time field
+        REQUIRED: false
+      - NAME: confirm
+        TYPE: boolean
+        DEFAULT: false
+        DESCRIPTION: Set true to actually create entry
+        REQUIRED: false
+  
+  - TOOL: list_project_deals
+    PURPOSE: Get deals/budgets for timesheet workflow
+    WORKFLOW_STEP: "2 - Budget selection in timesheet hierarchy"
+    PARAMETERS:
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: budget_type
+        TYPE: number
+        VALUES: [1, 2]
+        MAPPING:
+          - VALUE: 1
+            MEANING: deal
+          - VALUE: 2
+            MEANING: budget
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        MAX: 200
+        REQUIRED: false
+  
+  - TOOL: list_deal_services
+    PURPOSE: Get services for specific deal/budget
+    WORKFLOW_STEP: "3 - Service selection in timesheet hierarchy"
+    PARAMETERS:
+      - NAME: deal_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        MAX: 200
+        REQUIRED: false
+  
+  - TOOL: list_services
+    PURPOSE: List all services (not recommended for timesheet workflow)
+    WORKFLOW_STEP: "Alternative to deal_services but lacks hierarchy context"
+    PARAMETERS:
+      - NAME: company_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        MAX: 200
+        REQUIRED: false
+  
+  - TOOL: get_project_services
+    PURPOSE: DEPRECATED - Use proper workflow instead
+    WORKFLOW_STEP: "Replaced by list_project_deals → list_deal_services"
+    STATUS: deprecated
+    PARAMETERS:
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        MAX: 200
+        REQUIRED: false
 
 IMPLEMENTED_TOOLS:
   - TOOL: list_companies
@@ -395,6 +620,64 @@ IMPLEMENTED_TOOLS:
     DEPENDENCIES: PRODUCTIVE_USER_ID environment variable
     PARAMETERS: none
 
+  # WORKFLOW STATUS TOOLS
+  - TOOL: list_workflow_statuses
+    PURPOSE: Get available workflow statuses for tasks
+    PARAMETERS:
+      - NAME: workflow_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        REQUIRED: false
+  
+  - TOOL: update_task_status
+    PURPOSE: Update task status using workflow status ID
+    PARAMETERS:
+      - NAME: task_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: workflow_status_id
+        TYPE: string
+        REQUIRED: true
+  
+  # ACTIVITY AND COMMENTS TOOLS
+  - TOOL: list_activities
+    PURPOSE: Get activities within date range
+    PARAMETERS:
+      - NAME: after
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        REQUIRED: false
+      - NAME: before
+        TYPE: string
+        FORMAT: YYYY-MM-DD
+        REQUIRED: false
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 30
+        REQUIRED: false
+  
+  - TOOL: get_recent_updates
+    PURPOSE: Get recent updates to tasks/projects
+    PARAMETERS:
+      - NAME: limit
+        TYPE: number
+        DEFAULT: 10
+        REQUIRED: false
+  
+  - TOOL: add_task_comment
+    PURPOSE: Add comment to task
+    PARAMETERS:
+      - NAME: task_id
+        TYPE: string
+        REQUIRED: true
+      - NAME: comment
+        TYPE: string
+        MIN_LENGTH: 1
+        REQUIRED: true
+
 ENVIRONMENT_VARIABLES:
   - NAME: PRODUCTIVE_API_TOKEN
     PURPOSE: API authentication token
@@ -407,6 +690,106 @@ ENVIRONMENT_VARIABLES:
     USAGE: When set, tools accept "me" as assignee_id value
     AFFECTED_TOOLS: ["my_tasks", "create_task", "update_task_assignment", "whoami"]
     REQUIRED: false
+
+MCP_PROMPTS:
+  - PROMPT: timesheet_entry
+    PURPOSE: Guided workflow for creating timesheet entries
+    DESCRIPTION: "Complete 5-step workflow with validation and guidance"
+    WORKFLOW_STEPS:
+      - STEP: 1
+        ACTION: Project selection
+        TOOL: list_projects
+      - STEP: 2
+        ACTION: Budget/Deal selection
+        TOOL: list_project_deals
+      - STEP: 3
+        ACTION: Service selection
+        TOOL: list_deal_services
+      - STEP: 4
+        ACTION: Task selection (recommended)
+        TOOL: get_project_tasks
+      - STEP: 5
+        ACTION: Time entry creation
+        TOOL: create_time_entry
+    PARAMETERS:
+      - NAME: project_name
+        TYPE: string
+        DESCRIPTION: Optional project name to start with
+        REQUIRED: false
+      - NAME: date
+        TYPE: string
+        VALUES: ["today", "yesterday", "YYYY-MM-DD"]
+        REQUIRED: false
+      - NAME: time
+        TYPE: string
+        FORMAT: "2h", "120m", "2.5h"
+        REQUIRED: false
+      - NAME: work_description
+        TYPE: string
+        DESCRIPTION: Brief description of work
+        REQUIRED: false
+  
+  - PROMPT: timesheet_step
+    PURPOSE: Step-by-step guidance for timesheet workflow
+    DESCRIPTION: "Get specific help for current workflow step"
+    PARAMETERS:
+      - NAME: step
+        TYPE: string
+        VALUES: ["project", "budget", "service", "task", "create"]
+        REQUIRED: true
+      - NAME: project_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: deal_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: service_id
+        TYPE: string
+        REQUIRED: false
+      - NAME: task_id
+        TYPE: string
+        REQUIRED: false
+
+TIMESHEET_WORKFLOW_PATTERN:
+  ENFORCEMENT_LEVEL: strict
+  HIERARCHY_VALIDATION: required
+  STEPS:
+    - STEP: 1
+      NAME: project_selection
+      TOOL: list_projects
+      OUTPUT: project_id
+      VALIDATION: Project must exist and be active
+    - STEP: 2
+      NAME: budget_selection
+      TOOL: list_project_deals
+      INPUT: project_id
+      OUTPUT: deal_id
+      VALIDATION: Deal/budget must belong to project
+    - STEP: 3
+      NAME: service_selection
+      TOOL: list_deal_services
+      INPUT: deal_id
+      OUTPUT: service_id
+      VALIDATION: Service must belong to deal/budget
+    - STEP: 4
+      NAME: task_selection
+      TOOL: get_project_tasks
+      INPUT: project_id
+      OUTPUT: task_id
+      VALIDATION: Task must belong to project (recommended)
+    - STEP: 5
+      NAME: time_entry_creation
+      TOOL: create_time_entry
+      INPUT: [service_id, task_id, date, time, person_id, note]
+      OUTPUT: time_entry_id
+      VALIDATION: All required fields, service hierarchy, detailed note
+  
+  HIERARCHY_RULES:
+    - RULE: Time entries MUST be linked to a service within a deal/budget
+    - RULE: Services are accessed through deal/budget relationships
+    - RULE: Task linkage is optional but recommended for tracking
+    - RULE: Detailed work notes are required (minimum 10 characters)
+    - RULE: Date and time parsing supports multiple formats
 
 API_GOTCHAS:
   - ISSUE: Company ID filter format
@@ -440,6 +823,31 @@ API_GOTCHAS:
     PROBLEM: Claude doesn't automatically understand "me" refers to configured user
     SOLUTION: Added whoami tool and explicit instructions in server description
     IMPLEMENTATION: Server description includes "use 'me' as assignee_id" instruction
+  
+  - ISSUE: Time entry service hierarchy validation
+    PROBLEM: Time entries fail if service_id is not properly linked to deal/budget
+    SOLUTION: Enforce 5-step workflow: project → deal → service → task → time entry
+    AFFECTED_TOOLS: ["create_time_entry", "list_project_deals", "list_deal_services"]
+  
+  - ISSUE: Time parsing format variations
+    PROBLEM: Users input time in various formats ("2h", "120m", "2.5")
+    SOLUTION: Comprehensive parsing function supporting hours, minutes, decimals
+    IMPLEMENTATION: parseTimeToMinutes() function handles all common formats
+  
+  - ISSUE: Date parsing flexibility
+    PROBLEM: Users want natural date input ("today", "yesterday")
+    SOLUTION: parseDate() function handles relative and absolute dates
+    IMPLEMENTATION: Supports "today", "yesterday", "YYYY-MM-DD" formats
+  
+  - ISSUE: Workflow status vs task status confusion
+    PROBLEM: Tasks have both status (1/2) and workflow_status_id fields
+    SOLUTION: Separate tools for basic status vs workflow status updates
+    AFFECTED_TOOLS: ["update_task_status", "list_workflow_statuses"]
+  
+  - ISSUE: Time entry confirmation requirement
+    PROBLEM: Accidental time entry creation without user review
+    SOLUTION: Two-step confirmation process with preview before creation
+    IMPLEMENTATION: confirm parameter required to actually create entry
 
 SECURITY_REQUIREMENTS:
   - RULE: Never commit API tokens to version control
@@ -456,16 +864,25 @@ DEVELOPMENT_WORKFLOW:
   - STEP: Configure Claude Desktop config.json
 
 FUTURE_ENHANCEMENTS:
-  - FEATURE: Time tracking operations
   - FEATURE: Project creation
   - FEATURE: Update task fields beyond assignee (title, description, due date)
   - FEATURE: Delete operations (tasks, boards, task lists)
-  - FEATURE: Comments on tasks
   - FEATURE: Resource exposure for files/attachments
   - FEATURE: Response caching
   - FEATURE: Webhook support for real-time updates
   - FEATURE: Bulk operations (assign multiple tasks at once)
   - FEATURE: Search across all entities
+  - FEATURE: Time entry editing/deletion
+  - FEATURE: Advanced time reporting
+  - FEATURE: Budget tracking and utilization
+  - FEATURE: Service rate management
+  - FEATURE: Automated time entry suggestions
+  - FEATURE: Integration with calendar systems
+  - FEATURE: Time approval workflows
+  - FEATURE: Custom workflow status creation
+  - FEATURE: Batch time entry import/export
+  - FEATURE: Time entry templates
+  - FEATURE: Project time budgets and alerts
 
 COMPLETED_FEATURES:
   - FEATURE: Create tasks (implemented)
@@ -475,3 +892,32 @@ COMPLETED_FEATURES:
   - FEATURE: User context with "me" support (implemented)
   - FEATURE: Create boards (implemented)
   - FEATURE: Create task lists (partially - has API issues)
+  - FEATURE: Timesheet workflow (implemented)
+    DETAILS:
+      - 5-step guided workflow with validation
+      - Hierarchical enforcement (project → deal → service → task → time entry)
+      - Flexible time/date parsing ("2h", "today", etc.)
+      - Confirmation-based time entry creation
+      - MCP prompts for workflow guidance
+      - Service hierarchy validation
+      - Integration with existing task management
+  - FEATURE: Workflow status management (implemented)
+    DETAILS:
+      - List available workflow statuses
+      - Update task workflow status
+      - Separate from basic task status (open/closed)
+  - FEATURE: Activity tracking (implemented)
+    DETAILS:
+      - List activities within date ranges
+      - Get recent updates to tasks/projects
+      - Integration with timesheet workflow
+  - FEATURE: Task comments (implemented)
+    DETAILS:
+      - Add comments to tasks
+      - Enhanced task interaction capabilities
+  - FEATURE: MCP prompt system (implemented)
+    DETAILS:
+      - Guided workflow prompts
+      - Step-by-step timesheet guidance
+      - Interactive workflow assistance
+      - Progress tracking and validation
