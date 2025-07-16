@@ -264,7 +264,7 @@ export const listTasksDefinition = {
 
 export const getProjectTasksDefinition = {
   name: 'get_project_tasks',
-  description: 'Get all tasks for a specific project',
+  description: 'Get all tasks for a specific project. ALSO used as STEP 4 in timesheet workflow to find task_id for linking time entries to specific tasks. Workflow: list_projects → list_project_deals → list_deal_services → get_project_tasks → create_time_entry.',
   inputSchema: {
     type: 'object',
     properties: {

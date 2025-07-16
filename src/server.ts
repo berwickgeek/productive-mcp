@@ -1,6 +1,6 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { getConfig } from './config/index.js';
 import { ProductiveAPIClient } from './api/client.js';
 import { listProjectsTool, listProjectsDefinition } from './tools/projects.js';
@@ -16,6 +16,8 @@ import { getRecentUpdates, getRecentUpdatesTool } from './tools/recent-updates.j
 import { addTaskCommentTool, addTaskCommentDefinition } from './tools/comments.js';
 import { updateTaskStatusTool, updateTaskStatusDefinition } from './tools/task-status.js';
 import { listWorkflowStatusesTool, listWorkflowStatusesDefinition } from './tools/workflow-statuses.js';
+import { listTimeEntresTool, createTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition } from './tools/time-entries.js';
+import { generateTimesheetPrompt, timesheetPromptDefinition, generateQuickTimesheetPrompt, quickTimesheetPromptDefinition } from './prompts/timesheet.js';
 
 export async function createServer() {
   // Initialize API client and config early to check user context
@@ -31,6 +33,7 @@ export async function createServer() {
     {
       capabilities: {
         tools: {},
+        prompts: {},
       },
     }
   );
@@ -59,6 +62,12 @@ export async function createServer() {
       getProjectPeopleTool,
       listActivitiesTool,
       getRecentUpdatesTool,
+      listTimeEntriesDefinition,
+      createTimeEntryDefinition,
+      listProjectDealsDefinition,
+      listDealServicesDefinition,
+      listServicesDefinition,
+      getProjectServicesDefinition,
     ],
   }));
   
@@ -126,8 +135,49 @@ export async function createServer() {
       case 'get_recent_updates':
         return await getRecentUpdates(apiClient, args);
         
+      case 'list_time_entries':
+        return await listTimeEntresTool(apiClient, args, config);
+        
+      case 'create_time_entry':
+        return await createTimeEntryTool(apiClient, args, config);
+        
+      case 'list_project_deals':
+        return await listProjectDealsTool(apiClient, args);
+        
+      case 'list_deal_services':
+        return await listDealServicesTool(apiClient, args);
+        
+      case 'list_services':
+        return await listServicesTool(apiClient, args);
+        
+      case 'get_project_services':
+        return await getProjectServicesTool(apiClient, args);
+        
       default:
         throw new Error(`Unknown tool: ${name}`);
+    }
+  });
+
+  // Register prompt handlers
+  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    prompts: [
+      timesheetPromptDefinition,
+      quickTimesheetPromptDefinition,
+    ],
+  }));
+
+  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    
+    switch (name) {
+      case 'timesheet_entry':
+        return await generateTimesheetPrompt(args);
+        
+      case 'timesheet_step':
+        return await generateQuickTimesheetPrompt(args);
+        
+      default:
+        throw new Error(`Unknown prompt: ${name}`);
     }
   });
   

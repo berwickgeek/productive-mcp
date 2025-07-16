@@ -365,6 +365,144 @@ export interface ProductiveWorkflowStatus {
   };
 }
 
+/**
+ * Service entity interface for Productive API
+ * Services represent billable activities/work types in Productive
+ */
+export interface ProductiveService {
+  id: string;
+  type: 'services';
+  attributes: {
+    name: string;
+    description?: string;
+    is_active?: boolean;
+    created_at: string;
+    updated_at: string;
+    [key: string]: any;
+  };
+  relationships?: {
+    company?: {
+      data: {
+        id: string;
+        type: 'companies';
+      };
+    };
+    [key: string]: any;
+  };
+}
+
+/**
+ * Time entry entity interface for Productive API
+ * Represents logged time against tasks or projects
+ */
+export interface ProductiveTimeEntry {
+  id: string;
+  type: 'time_entries';
+  attributes: {
+    date: string; // ISO date format (YYYY-MM-DD)
+    time: number; // Time in minutes
+    billable_time?: number; // Billable time in minutes, defaults to time value
+    note?: string; // Description of work performed
+    created_at: string;
+    updated_at: string;
+    [key: string]: any;
+  };
+  relationships?: {
+    person?: {
+      data: {
+        id: string;
+        type: 'people';
+      };
+    };
+    service?: {
+      data: {
+        id: string;
+        type: 'services';
+      };
+    };
+    task?: {
+      data: {
+        id: string;
+        type: 'tasks';
+      };
+    };
+    project?: {
+      data: {
+        id: string;
+        type: 'projects';
+      };
+    };
+    [key: string]: any;
+  };
+}
+
+/**
+ * Deal/Budget entity representing project budgets or deals
+ */
+export interface ProductiveDeal {
+  id: string;
+  type: 'deals';
+  attributes: {
+    name: string;
+    budget_type?: number; // 1: deal, 2: budget
+    value?: number;
+    created_at?: string;
+    updated_at?: string;
+    [key: string]: any;
+  };
+  relationships?: {
+    project?: {
+      data?: {
+        id: string;
+        type: 'projects';
+      };
+    };
+    services?: {
+      data?: Array<{
+        id: string;
+        type: 'services';
+      }>;
+    };
+    [key: string]: any;
+  };
+}
+
+/**
+ * Time entry creation interface for Productive API
+ * Used when creating new time entries via POST requests
+ */
+export interface ProductiveTimeEntryCreate {
+  data: {
+    type: 'time_entries';
+    attributes: {
+      date: string; // ISO date format (YYYY-MM-DD)
+      time: number; // Time in minutes (required)
+      billable_time?: number; // Billable time in minutes, defaults to time value
+      note?: string; // Description of work performed
+    };
+    relationships: {
+      person: {
+        data: {
+          id: string;
+          type: 'people';
+        };
+      };
+      service: {
+        data: {
+          id: string;
+          type: 'services';
+        };
+      };
+      task?: {
+        data: {
+          id: string;
+          type: 'tasks';
+        };
+      };
+    };
+  };
+}
+
 export interface ProductiveError {
   errors: Array<{
     status?: string;
