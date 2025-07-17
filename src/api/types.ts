@@ -215,6 +215,7 @@ export interface ProductiveTaskUpdate {
       description?: string;
       due_date?: string;
       status?: number;
+      custom_fields?: Record<string, any>;
     };
     relationships?: {
       assignee?: {
@@ -227,6 +228,12 @@ export interface ProductiveTaskUpdate {
         data: {
           id: string;
           type: 'workflow_statuses';
+        };
+      };
+      task_list?: {
+        data: {
+          id: string;
+          type: 'task_lists';
         };
       };
     };

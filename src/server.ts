@@ -17,6 +17,9 @@ import { addTaskCommentTool, addTaskCommentDefinition } from './tools/comments.j
 import { updateTaskStatusTool, updateTaskStatusDefinition } from './tools/task-status.js';
 import { listWorkflowStatusesTool, listWorkflowStatusesDefinition } from './tools/workflow-statuses.js';
 import { listTimeEntresTool, createTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition } from './tools/time-entries.js';
+import { updateTaskSprint, updateTaskSprintTool } from './tools/task-sprint.js';
+import { moveTaskToList, moveTaskToListTool } from './tools/task-list-move.js';
+import { addToBacklog, addToBacklogTool } from './tools/task-backlog.js';
 import { generateTimesheetPrompt, timesheetPromptDefinition, generateQuickTimesheetPrompt, quickTimesheetPromptDefinition } from './prompts/timesheet.js';
 
 export async function createServer() {
@@ -68,6 +71,9 @@ export async function createServer() {
       listDealServicesDefinition,
       listServicesDefinition,
       getProjectServicesDefinition,
+      updateTaskSprintTool,
+      moveTaskToListTool,
+      addToBacklogTool,
     ],
   }));
   
@@ -152,6 +158,15 @@ export async function createServer() {
         
       case 'get_project_services':
         return await getProjectServicesTool(apiClient, args);
+        
+      case 'update_task_sprint':
+        return await updateTaskSprint(apiClient, args);
+        
+      case 'move_task_to_list':
+        return await moveTaskToList(apiClient, args);
+        
+      case 'add_to_backlog':
+        return await addToBacklog(apiClient, args);
         
       default:
         throw new Error(`Unknown tool: ${name}`);
