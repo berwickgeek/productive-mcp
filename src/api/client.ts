@@ -346,6 +346,49 @@ export class ProductiveAPIClient {
     });
   }
 
+  /**
+   * List comments with optional filters
+   * 
+   * @param params - Filter parameters for comments
+   * @param params.task_id - Filter by task ID
+   * @param params.limit - Number of results per page
+   * @param params.page - Page number for pagination
+   * @returns Promise resolving to paginated comments response
+   * 
+   * @example
+   * // Get comments for a specific task
+   * const comments = await client.listComments({
+   *   task_id: "123"
+   * });
+   */
+  async listComments(params?: {
+    task_id?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<ProductiveResponse<ProductiveComment>> {
+    const queryParams = new URLSearchParams();
+    
+    // Include creator relationship by default to show who wrote each comment
+    queryParams.append('include', 'creator');
+    
+    if (params?.task_id) {
+      queryParams.append('filter[task_id]', params.task_id);
+    }
+    
+    if (params?.limit) {
+      queryParams.append('page[size]', params.limit.toString());
+    }
+    
+    if (params?.page) {
+      queryParams.append('page[number]', params.page.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const path = `comments${queryString ? `?${queryString}` : ''}`;
+    
+    return this.makeRequest<ProductiveResponse<ProductiveComment>>(path);
+  }
+
   async listWorkflowStatuses(params?: {
     workflow_id?: string;
     category_id?: number;

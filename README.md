@@ -302,6 +302,19 @@ Parameters:
 - `task_id` (required): ID of the task to add the comment to
 - `comment` (required): Text content of the comment
 
+#### get_task_comments
+Get all comments for a task
+
+Parameters:
+- `task_id` (required): ID of the task to get comments from
+- `limit` (optional): Maximum number of comments to return per page (1-100, default: 25)
+- `page` (optional): Page number for pagination (default: 1)
+
+Returns:
+- List of comments with their content, creation date, author, and metadata
+- Shows if comments are pinned or edited
+- Includes pagination information
+
 #### update_task_status
 Update the status of a task using workflow status ID
 
@@ -396,8 +409,9 @@ When `PRODUCTIVE_USER_ID` is configured, you can use "me" in several tools:
 2. **Create task lists**: `create_task_list`
 3. **Create tasks**: `create_task` 
 4. **Add comments**: `add_task_comment`
-5. **Update status**: Use `list_workflow_statuses` then `update_task_status`
-6. **Track progress**: Use `list_activities` or `get_recent_updates`
+5. **Read comments**: `get_task_comments`
+6. **Update status**: Use `list_workflow_statuses` then `update_task_status`
+7. **Track progress**: Use `list_activities` or `get_recent_updates`
 
 ## Development
 

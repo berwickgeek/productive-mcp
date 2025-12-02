@@ -13,7 +13,7 @@ import { listTaskLists, createTaskList, listTaskListsTool, createTaskListTool } 
 import { whoAmI, whoAmITool } from './tools/whoami.js';
 import { listActivities, listActivitiesTool } from './tools/activities.js';
 import { getRecentUpdates, getRecentUpdatesTool } from './tools/recent-updates.js';
-import { addTaskCommentTool, addTaskCommentDefinition } from './tools/comments.js';
+import { addTaskCommentTool, addTaskCommentDefinition, getTaskCommentsTool, getTaskCommentsDefinition } from './tools/comments.js';
 import { updateTaskStatusTool, updateTaskStatusDefinition } from './tools/task-status.js';
 import { listWorkflowStatusesTool, listWorkflowStatusesDefinition } from './tools/workflow-statuses.js';
 import { listTimeEntresTool, createTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition } from './tools/time-entries.js';
@@ -60,6 +60,7 @@ export async function createServer() {
       updateTaskAssignmentDefinition,
       updateTaskDetailsDefinition,
       addTaskCommentDefinition,
+      getTaskCommentsDefinition,
       updateTaskStatusDefinition,
       listWorkflowStatusesDefinition,
       myTasksDefinition,
@@ -120,6 +121,9 @@ export async function createServer() {
         
       case 'add_task_comment':
         return await addTaskCommentTool(apiClient, args);
+        
+      case 'get_task_comments':
+        return await getTaskCommentsTool(apiClient, args);
         
       case 'update_task_status':
         return await updateTaskStatusTool(apiClient, args);
