@@ -531,3 +531,213 @@ export interface TaskReposition {
   move_after_id?: string;  // Move task after specified task ID
   placement?: number;      // Legacy parameter, not recommended
 }
+
+/**
+ * Time entry update interface for Productive API
+ */
+export interface ProductiveTimeEntryUpdate {
+  data: {
+    type: 'time_entries';
+    id: string;
+    attributes?: {
+      date?: string;
+      time?: number;
+      billable_time?: number;
+      note?: string;
+    };
+    relationships?: {
+      service?: {
+        data: {
+          id: string;
+          type: 'services';
+        };
+      };
+      task?: {
+        data: {
+          id: string;
+          type: 'tasks';
+        } | null;
+      };
+    };
+  };
+}
+
+/**
+ * Invoice entity representing billing invoices in Productive
+ */
+export interface ProductiveInvoice {
+  id: string;
+  type: 'invoices';
+  attributes: {
+    number?: string;
+    status?: number; // 1=draft, 2=sent, 3=paid, 4=canceled
+    currency?: string;
+    total?: number;
+    total_tax?: number;
+    paid_amount?: number;
+    due_date?: string;
+    invoice_date?: string;
+    note?: string;
+    created_at: string;
+    updated_at: string;
+    [key: string]: unknown;
+  };
+  relationships?: {
+    company?: {
+      data: {
+        id: string;
+        type: 'companies';
+      };
+    };
+    project?: {
+      data: {
+        id: string;
+        type: 'projects';
+      };
+    };
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Expense entity for tracking project expenses
+ */
+export interface ProductiveExpense {
+  id: string;
+  type: 'expenses';
+  attributes: {
+    date: string;
+    amount: number;
+    currency?: string;
+    note?: string;
+    billable?: boolean;
+    approved?: boolean;
+    created_at: string;
+    updated_at: string;
+    [key: string]: unknown;
+  };
+  relationships?: {
+    person?: {
+      data: {
+        id: string;
+        type: 'people';
+      };
+    };
+    project?: {
+      data: {
+        id: string;
+        type: 'projects';
+      };
+    };
+    deal?: {
+      data: {
+        id: string;
+        type: 'deals';
+      };
+    };
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Expense creation interface for Productive API
+ */
+export interface ProductiveExpenseCreate {
+  data: {
+    type: 'expenses';
+    attributes: {
+      date: string;
+      amount: number;
+      note?: string;
+      billable?: boolean;
+    };
+    relationships: {
+      person: {
+        data: {
+          id: string;
+          type: 'people';
+        };
+      };
+      project?: {
+        data: {
+          id: string;
+          type: 'projects';
+        };
+      };
+      deal?: {
+        data: {
+          id: string;
+          type: 'deals';
+        };
+      };
+    };
+  };
+}
+
+/**
+ * Membership entity representing project/team memberships
+ */
+export interface ProductiveMembership {
+  id: string;
+  type: 'memberships';
+  attributes: {
+    role?: number;
+    created_at: string;
+    updated_at: string;
+    [key: string]: unknown;
+  };
+  relationships?: {
+    person?: {
+      data: {
+        id: string;
+        type: 'people';
+      };
+    };
+    project?: {
+      data: {
+        id: string;
+        type: 'projects';
+      };
+    };
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Booking entity for resource planning/capacity management
+ */
+export interface ProductiveBooking {
+  id: string;
+  type: 'bookings';
+  attributes: {
+    started_on: string;
+    ended_on: string;
+    time?: number; // minutes per day
+    booked_time?: number;
+    note?: string;
+    created_at: string;
+    updated_at: string;
+    [key: string]: unknown;
+  };
+  relationships?: {
+    person?: {
+      data: {
+        id: string;
+        type: 'people';
+      };
+    };
+    project?: {
+      data: {
+        id: string;
+        type: 'projects';
+      };
+    };
+    deal?: {
+      data: {
+        id: string;
+        type: 'deals';
+      };
+    };
+    [key: string]: unknown;
+  };
+}

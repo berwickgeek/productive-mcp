@@ -234,15 +234,12 @@ export async function getTaskTool(
     // Include task list ID information if available
     if (taskListId) {
       text += `Task List ID: ${taskListId}\n`;
-      
-    // If there's included data for the task list, include the name
-    console.log('Included data:', JSON.stringify(data.included));
-    if (data.included && Array.isArray(data.included)) {
-      const taskList = data.included.find((item: any) => item.type === 'task_lists' && item.id === taskListId);
-      if (taskList) {
-        text += `Task List: ${taskList.attributes.name}\n`;
+      if (data.included && Array.isArray(data.included)) {
+        const taskList = data.included.find((item: { type: string; id: string; attributes: { name: string } }) => item.type === 'task_lists' && item.id === taskListId);
+        if (taskList) {
+          text += `Task List: ${taskList.attributes.name}\n`;
+        }
       }
-    }
     }
     
     return {

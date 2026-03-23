@@ -156,40 +156,18 @@ export const taskRepositionTool = async (apiClient: ProductiveAPIClient, args: z
     
     // Format the response to match the MCP tool expected format
     // Handle the new response format which is a success object
-    if (result.success) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Task ${args.taskId} repositioned successfully.
-The task has been moved ${args.moveToTop ? 'to the top of the list' : 
-                           args.moveToBottom ? 'to the bottom of the list' : 
-                           args.move_before_id ? `before task ${args.move_before_id}` : 
-                           args.move_after_id ? `after task ${args.move_after_id}` : 
+    return {
+      content: [{
+        type: 'text',
+        text: `Task ${args.taskId} repositioned successfully.
+The task has been moved ${args.moveToTop ? 'to the top of the list' :
+                           args.moveToBottom ? 'to the bottom of the list' :
+                           args.move_before_id ? `before task ${args.move_before_id}` :
+                           args.move_after_id ? `after task ${args.move_after_id}` :
                            'to a new position'}.`,
-        }],
-      };
-    } else if (result.data) {
-      // Fallback for old response format if somehow returned
-      return {
-        content: [{
-          type: 'text',
-          text: `Task ${result.data.id} repositioned successfully.
-Title: ${result.data.attributes?.title || 'Unknown'}
-Position updated according to the requested parameters.`,
-        }],
-      };
-    } else {
-      // Generic success if neither format is matched
-      return {
-        content: [{
-          type: 'text',
-          text: `Task repositioning operation completed successfully.`,
-        }],
-      };
-    }
+      }],
+    };
   } catch (error) {
-    // Handle errors more gracefully
-    console.error('Error in taskRepositionTool:', error);
     return {
       content: [{
         type: 'text',

@@ -1,8 +1,8 @@
 import { Config } from '../config/index.js';
-import { 
-  ProductiveCompany, 
-  ProductiveProject, 
-  ProductiveTask, 
+import {
+  ProductiveCompany,
+  ProductiveProject,
+  ProductiveTask,
   ProductiveBoard,
   ProductiveTaskList,
   ProductivePerson,
@@ -11,8 +11,14 @@ import {
   ProductiveWorkflowStatus,
   ProductiveService,
   ProductiveTimeEntry,
+  ProductiveTimeEntryUpdate,
   ProductiveDeal,
-  ProductiveResponse, 
+  ProductiveInvoice,
+  ProductiveExpense,
+  ProductiveExpenseCreate,
+  ProductiveMembership,
+  ProductiveBooking,
+  ProductiveResponse,
   ProductiveSingleResponse,
   ProductiveTaskCreate,
   ProductiveTaskUpdate,
@@ -20,7 +26,7 @@ import {
   ProductiveTaskListCreate,
   ProductiveCommentCreate,
   ProductiveTimeEntryCreate,
-  ProductiveError 
+  ProductiveError
 } from './types.js';
 
 export class ProductiveAPIClient {
@@ -40,31 +46,43 @@ export class ProductiveAPIClient {
   
   private async makeRequest<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${this.config.PRODUCTIVE_API_BASE_URL}${path}`;
-    
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...this.getHeaders(),
+        ...options?.headers,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.buildErrorMessage(response));
+    }
+
+    return await response.json() as T;
+  }
+
+  private async buildErrorMessage(response: Response): Promise<string> {
+    // Try to extract the API's own error detail from the JSON body
+    let apiDetail = '';
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...this.getHeaders(),
-          ...options?.headers,
-        },
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json() as ProductiveError;
-        // Debug: Log full error response
-        console.error('API Error Response:', JSON.stringify(errorData, null, 2));
-        console.error('Request was to:', url);
-        const errorMessage = errorData.errors?.[0]?.detail || `API request failed with status ${response.status}`;
-        throw new Error(errorMessage);
-      }
-      
-      return await response.json() as T;
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Unknown error occurred while making API request');
+      const errorData = await response.json() as ProductiveError;
+      apiDetail = errorData.errors?.[0]?.detail ?? errorData.errors?.[0]?.title ?? '';
+    } catch {
+      // Response body was empty or not JSON — fall through to status-based message
+    }
+
+    switch (response.status) {
+      case 401:
+        return `Authentication failed${apiDetail ? `: ${apiDetail}` : '. Check your PRODUCTIVE_API_TOKEN.'}`;
+      case 403:
+        return `Permission denied${apiDetail ? `: ${apiDetail}` : '. Your Productive.io account does not have access to this resource.'}`;
+      case 404:
+        return `Not found${apiDetail ? `: ${apiDetail}` : '. The requested resource does not exist.'}`;
+      case 422:
+        return `Invalid request${apiDetail ? `: ${apiDetail}` : '. Check the provided parameters.'}`;
+      default:
+        return apiDetail || `API request failed with status ${response.status}`;
     }
   }
   
@@ -482,12 +500,28 @@ export class ProductiveAPIClient {
    * });
    */
   async createTimeEntry(timeEntryData: ProductiveTimeEntryCreate): Promise<ProductiveSingleResponse<ProductiveTimeEntry>> {
-    // Debug: Log the request body
-    console.error('Creating time entry with data:', JSON.stringify(timeEntryData, null, 2));
     return this.makeRequest<ProductiveSingleResponse<ProductiveTimeEntry>>('time_entries', {
       method: 'POST',
       body: JSON.stringify(timeEntryData),
     });
+  }
+
+  async updateTimeEntry(timeEntryId: string, data: ProductiveTimeEntryUpdate): Promise<ProductiveSingleResponse<ProductiveTimeEntry>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveTimeEntry>>(`time_entries/${timeEntryId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTimeEntry(timeEntryId: string): Promise<void> {
+    const url = `${this.config.PRODUCTIVE_API_BASE_URL}time_entries/${timeEntryId}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok && response.status !== 204) {
+      throw new Error(await this.buildErrorMessage(response));
+    }
   }
 
   /**
@@ -743,8 +777,8 @@ export class ProductiveAPIClient {
     return this.getAllPages('services', qp);
   }
 
-  /** List resource bookings (raw, no included resolution) */
-  async listBookings(params?: { after?: string; before?: string; person_id?: string }): Promise<any[]> {
+  /** List resource bookings (raw, no included resolution) — used by rb2 tools */
+  async listBookingsRaw(params?: { after?: string; before?: string; person_id?: string }): Promise<any[]> {
     const qp = new URLSearchParams();
     if (params?.after) qp.set('filter[after]', params.after);
     if (params?.before) qp.set('filter[before]', params.before);
@@ -789,13 +823,13 @@ export class ProductiveAPIClient {
   }
 
   async repositionTask(
-    taskId: string, 
-    attributes: { 
-      move_before_id?: string; 
+    taskId: string,
+    attributes: {
+      move_before_id?: string;
       move_after_id?: string;
       placement?: number;
     }
-  ): Promise<any> {
+  ): Promise<{ success: boolean; taskId: string; message: string }> {
     const requestBody = {
       data: {
         type: 'tasks',
@@ -803,50 +837,164 @@ export class ProductiveAPIClient {
       }
     };
 
-    // The reposition endpoint returns 204 No Content on success
     const url = `${this.config.PRODUCTIVE_API_BASE_URL}tasks/${taskId}/reposition`;
-    
-    try {
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'X-Auth-Token': this.config.PRODUCTIVE_API_TOKEN,
-          'X-Organization-Id': this.config.PRODUCTIVE_ORG_ID,
-          'Content-Type': 'application/vnd.api+json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`Task ${taskId} not found or cannot be repositioned.`);
-        }
-        throw new Error(`Reposition failed with status ${response.status}: ${response.statusText}`);
-      }
-      
-      // If 204 No Content (success), return a minimal success response
-      if (response.status === 204) {
-        return {
-          success: true,
-          taskId: taskId,
-          message: `Task ${taskId} repositioned successfully`
-        };
-      }
-      
-      // For any other success response with content, try to parse JSON
-      try {
-        return await response.json();
-      } catch (e) {
-        // If parsing fails but status was success, return a minimal success object
-        return {
-          success: true,
-          taskId: taskId,
-          message: `Task ${taskId} repositioned successfully`
-        };
-      }
-    } catch (error) {
-      console.error('Error repositioning task:', error);
-      throw error;
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.buildErrorMessage(response));
     }
+
+    return {
+      success: true,
+      taskId: taskId,
+      message: `Task ${taskId} repositioned successfully`
+    };
+  }
+
+  async getPerson(personId: string): Promise<ProductiveSingleResponse<ProductivePerson>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductivePerson>>(`people/${personId}`);
+  }
+
+  async listInvoices(params?: {
+    company_id?: string;
+    project_id?: string;
+    status?: number;
+    after?: string;
+    before?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<ProductiveResponse<ProductiveInvoice>> {
+    const queryParams = new URLSearchParams();
+
+    if (params?.company_id) {
+      queryParams.append('filter[company_id]', params.company_id);
+    }
+    if (params?.project_id) {
+      queryParams.append('filter[project_id]', params.project_id);
+    }
+    if (params?.status !== undefined) {
+      queryParams.append('filter[status]', params.status.toString());
+    }
+    if (params?.after) {
+      queryParams.append('filter[after]', params.after);
+    }
+    if (params?.before) {
+      queryParams.append('filter[before]', params.before);
+    }
+    if (params?.limit) {
+      queryParams.append('page[size]', params.limit.toString());
+    }
+    if (params?.page) {
+      queryParams.append('page[number]', params.page.toString());
+    }
+
+    const queryString = queryParams.toString();
+    return this.makeRequest<ProductiveResponse<ProductiveInvoice>>(`invoices${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getInvoice(invoiceId: string): Promise<ProductiveSingleResponse<ProductiveInvoice>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveInvoice>>(`invoices/${invoiceId}`);
+  }
+
+  async listExpenses(params?: {
+    person_id?: string;
+    project_id?: string;
+    after?: string;
+    before?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<ProductiveResponse<ProductiveExpense>> {
+    const queryParams = new URLSearchParams();
+
+    if (params?.person_id) {
+      queryParams.append('filter[person_id]', params.person_id);
+    }
+    if (params?.project_id) {
+      queryParams.append('filter[project_id]', params.project_id);
+    }
+    if (params?.after) {
+      queryParams.append('filter[after]', params.after);
+    }
+    if (params?.before) {
+      queryParams.append('filter[before]', params.before);
+    }
+    if (params?.limit) {
+      queryParams.append('page[size]', params.limit.toString());
+    }
+    if (params?.page) {
+      queryParams.append('page[number]', params.page.toString());
+    }
+
+    const queryString = queryParams.toString();
+    return this.makeRequest<ProductiveResponse<ProductiveExpense>>(`expenses${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async createExpense(data: ProductiveExpenseCreate): Promise<ProductiveSingleResponse<ProductiveExpense>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveExpense>>('expenses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async listMemberships(params?: {
+    project_id?: string;
+    person_id?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<ProductiveResponse<ProductiveMembership>> {
+    const queryParams = new URLSearchParams();
+
+    if (params?.project_id) {
+      queryParams.append('filter[project_id]', params.project_id);
+    }
+    if (params?.person_id) {
+      queryParams.append('filter[person_id]', params.person_id);
+    }
+    if (params?.limit) {
+      queryParams.append('page[size]', params.limit.toString());
+    }
+    if (params?.page) {
+      queryParams.append('page[number]', params.page.toString());
+    }
+
+    const queryString = queryParams.toString();
+    return this.makeRequest<ProductiveResponse<ProductiveMembership>>(`memberships${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async listBookingsTyped(params?: {
+    person_id?: string;
+    project_id?: string;
+    after?: string;
+    before?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<ProductiveResponse<ProductiveBooking>> {
+    const queryParams = new URLSearchParams();
+
+    if (params?.person_id) {
+      queryParams.append('filter[person_id]', params.person_id);
+    }
+    if (params?.project_id) {
+      queryParams.append('filter[project_id]', params.project_id);
+    }
+    if (params?.after) {
+      queryParams.append('filter[started_on_after]', params.after);
+    }
+    if (params?.before) {
+      queryParams.append('filter[started_on_before]', params.before);
+    }
+    if (params?.limit) {
+      queryParams.append('page[size]', params.limit.toString());
+    }
+    if (params?.page) {
+      queryParams.append('page[number]', params.page.toString());
+    }
+
+    const queryString = queryParams.toString();
+    return this.makeRequest<ProductiveResponse<ProductiveBooking>>(`bookings${queryString ? `?${queryString}` : ''}`);
   }
 }

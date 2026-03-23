@@ -16,14 +16,18 @@ import { getRecentUpdates, getRecentUpdatesTool } from './tools/recent-updates.j
 import { addTaskCommentTool, addTaskCommentDefinition } from './tools/comments.js';
 import { updateTaskStatusTool, updateTaskStatusDefinition } from './tools/task-status.js';
 import { listWorkflowStatusesTool, listWorkflowStatusesDefinition } from './tools/workflow-statuses.js';
-import { listTimeEntresTool, createTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition } from './tools/time-entries.js';
+import { listTimeEntresTool, createTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition, updateTimeEntryTool, updateTimeEntryDefinition, deleteTimeEntryTool, deleteTimeEntryDefinition } from './tools/time-entries.js';
 import { updateTaskSprint, updateTaskSprintTool } from './tools/task-sprint.js';
 import { moveTaskToList, moveTaskToListTool } from './tools/task-list-move.js';
 import { addToBacklog, addToBacklogTool } from './tools/task-backlog.js';
 import { taskRepositionTool, taskRepositionDefinition, taskRepositionSchema } from './tools/task-reposition.js';
 import { generateTimesheetPrompt, timesheetPromptDefinition, generateQuickTimesheetPrompt, quickTimesheetPromptDefinition } from './prompts/timesheet.js';
+import { listPeopleTool, getPersonTool, listPeopleDefinition, getPersonDefinition } from './tools/people.js';
+import { listInvoicesTool, getInvoiceTool, listInvoicesDefinition, getInvoiceDefinition } from './tools/invoices.js';
+import { listExpensesTool, createExpenseTool, listExpensesDefinition, createExpenseDefinition } from './tools/expenses.js';
+import { listMembershipsTool, listMembershipsDefinition } from './tools/memberships.js';
+import { listBookingsTool, listBookingsDefinition, getResourcePlanTool, getOverbookedPeopleTool, getResourcePlanHandler, getOverbookedPeopleHandler } from './tools/bookings.js';
 import { getBudgetBurnTool, getBudgetBurnTool_handler } from './tools/budgets.js';
-import { getResourcePlanTool, getOverbookedPeopleTool, getResourcePlanHandler, getOverbookedPeopleHandler } from './tools/bookings.js';
 import { getOrgOverviewTool, getOrgOverviewHandler } from './tools/org.js';
 
 export async function createServer() {
@@ -78,6 +82,23 @@ export async function createServer() {
       moveTaskToListTool,
       addToBacklogTool,
       taskRepositionDefinition,
+      // People
+      listPeopleDefinition,
+      getPersonDefinition,
+      // Time entry management
+      updateTimeEntryDefinition,
+      deleteTimeEntryDefinition,
+      // Invoices
+      listInvoicesDefinition,
+      getInvoiceDefinition,
+      // Expenses
+      listExpensesDefinition,
+      createExpenseDefinition,
+      // Project memberships
+      listMembershipsDefinition,
+      // Bookings / capacity planning
+      listBookingsDefinition,
+      // rb2 tools
       getBudgetBurnTool,
       getResourcePlanTool,
       getOverbookedPeopleTool,
@@ -179,7 +200,45 @@ export async function createServer() {
           throw new Error('taskId is required for task repositioning');
         }
         return await taskRepositionTool(apiClient, args as z.infer<typeof taskRepositionSchema>);
-        
+
+
+      // People
+      case 'list_people':
+        return await listPeopleTool(apiClient, args);
+
+      case 'get_person':
+        return await getPersonTool(apiClient, args);
+
+      // Time entry management
+      case 'update_time_entry':
+        return await updateTimeEntryTool(apiClient, args);
+
+      case 'delete_time_entry':
+        return await deleteTimeEntryTool(apiClient, args);
+
+      // Invoices
+      case 'list_invoices':
+        return await listInvoicesTool(apiClient, args);
+
+      case 'get_invoice':
+        return await getInvoiceTool(apiClient, args);
+
+      // Expenses
+      case 'list_expenses':
+        return await listExpensesTool(apiClient, args, config);
+
+      case 'create_expense':
+        return await createExpenseTool(apiClient, args, config);
+
+      // Memberships
+      case 'list_memberships':
+        return await listMembershipsTool(apiClient, args);
+
+      // Bookings
+      case 'list_bookings':
+        return await listBookingsTool(apiClient, args, config);
+
+      // rb2 tools
       case 'get_budget_burn':
         return await getBudgetBurnTool_handler(apiClient, args);
 
