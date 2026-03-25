@@ -10,9 +10,9 @@ const ListActivitiesRequestSchema = z.object({
   event: z.string().optional(),
   after: z.string().optional(), // ISO 8601 date string
   before: z.string().optional(), // ISO 8601 date string
-  days_back: z.number().min(1).max(365).optional(), // Helper for "last N days"
-  limit: z.number().min(1).max(200).optional(),
-  page: z.number().min(1).optional(),
+  days_back: z.coerce.number().min(1).max(365).optional(), // Helper for "last N days"
+  limit: z.coerce.number().min(1).max(200).optional(),
+  page: z.coerce.number().min(1).optional(),
 });
 
 export async function listActivities(

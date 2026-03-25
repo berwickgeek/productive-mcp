@@ -16,7 +16,7 @@ import { getRecentUpdates, getRecentUpdatesTool } from './tools/recent-updates.j
 import { addTaskCommentTool, addTaskCommentDefinition } from './tools/comments.js';
 import { updateTaskStatusTool, updateTaskStatusDefinition } from './tools/task-status.js';
 import { listWorkflowStatusesTool, listWorkflowStatusesDefinition } from './tools/workflow-statuses.js';
-import { listTimeEntresTool, createTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition } from './tools/time-entries.js';
+import { listTimeEntresTool, createTimeEntryTool, updateTimeEntryTool, deleteTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, updateTimeEntryDefinition, deleteTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition } from './tools/time-entries.js';
 import { updateTaskSprint, updateTaskSprintTool } from './tools/task-sprint.js';
 import { moveTaskToList, moveTaskToListTool } from './tools/task-list-move.js';
 import { addToBacklog, addToBacklogTool } from './tools/task-backlog.js';
@@ -67,6 +67,8 @@ export async function createServer() {
       getRecentUpdatesTool,
       listTimeEntriesDefinition,
       createTimeEntryDefinition,
+      updateTimeEntryDefinition,
+      deleteTimeEntryDefinition,
       listProjectDealsDefinition,
       listDealServicesDefinition,
       listServicesDefinition,
@@ -144,7 +146,13 @@ export async function createServer() {
         
       case 'create_time_entry':
         return await createTimeEntryTool(apiClient, args, config);
-        
+
+      case 'update_time_entry':
+        return await updateTimeEntryTool(apiClient, args);
+
+      case 'delete_time_entry':
+        return await deleteTimeEntryTool(apiClient, args);
+
       case 'list_project_deals':
         return await listProjectDealsTool(apiClient, args);
         

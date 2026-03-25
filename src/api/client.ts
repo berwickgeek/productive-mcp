@@ -1,8 +1,8 @@
 import { Config } from '../config/index.js';
-import { 
-  ProductiveCompany, 
-  ProductiveProject, 
-  ProductiveTask, 
+import {
+  ProductiveCompany,
+  ProductiveProject,
+  ProductiveTask,
   ProductiveBoard,
   ProductiveTaskList,
   ProductivePerson,
@@ -12,7 +12,7 @@ import {
   ProductiveService,
   ProductiveTimeEntry,
   ProductiveDeal,
-  ProductiveResponse, 
+  ProductiveResponse,
   ProductiveSingleResponse,
   ProductiveTaskCreate,
   ProductiveTaskUpdate,
@@ -20,7 +20,8 @@ import {
   ProductiveTaskListCreate,
   ProductiveCommentCreate,
   ProductiveTimeEntryCreate,
-  ProductiveError 
+  ProductiveTimeEntryUpdate,
+  ProductiveError
 } from './types.js';
 
 export class ProductiveAPIClient {
@@ -485,12 +486,30 @@ export class ProductiveAPIClient {
    * });
    */
   async createTimeEntry(timeEntryData: ProductiveTimeEntryCreate): Promise<ProductiveSingleResponse<ProductiveTimeEntry>> {
-    // Debug: Log the request body
-    console.error('Creating time entry with data:', JSON.stringify(timeEntryData, null, 2));
     return this.makeRequest<ProductiveSingleResponse<ProductiveTimeEntry>>('time_entries', {
       method: 'POST',
       body: JSON.stringify(timeEntryData),
     });
+  }
+
+  async updateTimeEntry(timeEntryData: ProductiveTimeEntryUpdate): Promise<ProductiveSingleResponse<ProductiveTimeEntry>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveTimeEntry>>(`time_entries/${timeEntryData.data.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(timeEntryData),
+    });
+  }
+
+  async deleteTimeEntry(timeEntryId: string): Promise<void> {
+    const url = `${this.config.PRODUCTIVE_API_BASE_URL}time_entries/${timeEntryId}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) {
+      const errorData = await response.json() as ProductiveError;
+      const errorMessage = errorData.errors?.[0]?.detail || `Delete failed with status ${response.status}`;
+      throw new Error(errorMessage);
+    }
   }
 
   /**
@@ -598,13 +617,18 @@ export class ProductiveAPIClient {
    */
   async listServices(params?: {
     company_id?: string;
+    project_id?: string;
     limit?: number;
     page?: number;
   }): Promise<ProductiveResponse<ProductiveService>> {
     const queryParams = new URLSearchParams();
-    
+
     if (params?.company_id) {
       queryParams.append('filter[company_id]', params.company_id);
+    }
+
+    if (params?.project_id) {
+      queryParams.append('filter[project_id]', params.project_id);
     }
     
     if (params?.limit) {

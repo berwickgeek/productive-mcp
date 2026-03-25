@@ -23,7 +23,7 @@ const listTasksSchema = z.object({
   project_id: z.string().optional(),
   assignee_id: z.string().optional(),
   status: z.enum(['open', 'closed']).optional(),
-  limit: z.number().min(1).max(200).default(30).optional(),
+  limit: z.coerce.number().min(1).max(200).default(30).optional(),
 });
 
 const getProjectTasksSchema = z.object({

@@ -4,8 +4,8 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 const listWorkflowStatusesSchema = z.object({
   workflow_id: z.string().optional(),
-  category_id: z.number().int().min(1).max(3).optional(),
-  limit: z.number().min(1).max(200).default(50).optional(),
+  category_id: z.coerce.number().int().min(1).max(3).optional(),
+  limit: z.coerce.number().min(1).max(200).default(50).optional(),
 });
 
 export async function listWorkflowStatusesTool(

@@ -5,7 +5,7 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 const listProjectsSchema = z.object({
   status: z.enum(['active', 'archived']).optional(),
   company_id: z.string().optional(),
-  limit: z.number().min(1).max(200).default(30).optional(),
+  limit: z.coerce.number().min(1).max(200).default(30).optional(),
 });
 
 export async function listProjectsTool(

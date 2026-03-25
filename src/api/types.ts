@@ -518,6 +518,19 @@ export interface ProductiveTimeEntryCreate {
   };
 }
 
+export interface ProductiveTimeEntryUpdate {
+  data: {
+    type: 'time_entries';
+    id: string;
+    attributes: {
+      date?: string;
+      time?: number;
+      billable_time?: number;
+      note?: string;
+    };
+  };
+}
+
 export interface ProductiveError {
   errors: Array<{
     status?: string;

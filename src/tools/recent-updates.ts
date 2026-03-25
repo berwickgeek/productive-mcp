@@ -4,8 +4,8 @@ import { ProductiveAPIClient } from '../api/client.js';
 
 const RecentUpdatesRequestSchema = z.object({
   project_id: z.string().optional(),
-  days_back: z.number().min(1).max(30).default(7),
-  limit: z.number().min(1).max(200).optional(),
+  days_back: z.coerce.number().min(1).max(30).default(7),
+  limit: z.coerce.number().min(1).max(200).optional(),
 });
 
 export async function getRecentUpdates(

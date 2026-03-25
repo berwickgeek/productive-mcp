@@ -4,7 +4,7 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 const ListBoardsSchema = z.object({
   project_id: z.string().optional().describe('Filter boards by project ID'),
-  limit: z.number().optional().default(30).describe('Number of boards to return (max 200)'),
+  limit: z.coerce.number().optional().default(30).describe('Number of boards to return (max 200)'),
 });
 
 export async function listBoards(
