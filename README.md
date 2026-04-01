@@ -243,7 +243,7 @@ Restart Claude Code after configuration.
 | `create_task` | Create a task. Requires `title`. Optional `project_id`, `board_id`, `task_list_id`, `assignee_id` ("me" supported), `due_date`, `status` |
 | `update_task_assignment` | Assign/unassign a task. Requires `task_id`, `assignee_id` ("me" or "null" supported) |
 | `update_task_details` | Update title/description. Requires `task_id`, optional `title`, `description`, `description_html` |
-| `update_task_status` | Set workflow status. Requires `task_id`, `workflow_status_id` |
+| `update_task_status` | Set workflow status by name or ID. Requires `task_id` and either `status_name` (e.g. "In Progress", "On Hold") or `workflow_status_id`. Automatically resolves the task's project workflow, supports custom statuses |
 | `delete_task` | Delete a task by `task_id` |
 | `my_tasks` | Get tasks assigned to you. Optional `status`, `limit` |
 | `reposition_task` | Reorder a task within a list |
@@ -321,21 +321,31 @@ Restart Claude Code after configuration.
 
 ### Updating Task Status
 
-To update a task's status, you need to use workflow status IDs rather than simple "open"/"closed" values:
+You can update a task's status by name — no need to look up IDs:
 
-1. **First, list available workflow statuses**:
-   ```
-   list_workflow_statuses
-   ```
-   This will show you all available statuses with their IDs and categories (Not Started=1, Started=2, Closed=3).
+```
+update_task_status {
+  "task_id": "12399194",
+  "status_name": "On Hold"
+}
+```
 
-2. **Then update the task status**:
-   ```
-   update_task_status {
-     "task_id": "12399194",
-     "workflow_status_id": "specific_status_id_from_step_1"
-   }
-   ```
+The tool automatically resolves the task's project workflow and matches the status name (case-insensitive, supports partial matching). This works with custom workflow statuses too.
+
+If the name doesn't match or is ambiguous, it returns the available statuses for that project:
+
+```
+No workflow status matching "banana" found.
+
+Available statuses:
+  • "Pending" (ID: 102305) — Not Started
+  • "Open" (ID: 102291) — Started
+  • "On Hold" (ID: 102306) — Started
+  • "Waiting" (ID: 102307) — Started
+  • "Closed" (ID: 102292) — Closed
+```
+
+You can also pass `workflow_status_id` directly if you already know the ID.
 
 ### Working with "me" Context
 
@@ -352,7 +362,7 @@ When `PRODUCTIVE_USER_ID` is configured, you can use "me" in several tools:
 3. **Create tasks**: `create_task`
 4. **Break down work**: `create_subtask` for sub-items, `create_todo` for checklists
 5. **Add comments**: `add_task_comment`
-6. **Update status**: Use `list_workflow_statuses` then `update_task_status`
+6. **Update status**: `update_task_status` with `status_name` (e.g. "Open", "On Hold", "Closed")
 7. **Track progress**: Use `list_activities` or `get_recent_updates`
 
 ### Building Documentation
