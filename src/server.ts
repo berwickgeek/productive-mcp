@@ -26,6 +26,7 @@ import { listFolders, listFoldersTool, getFolder, getFolderTool, createFolder, c
 import { listSubtasksTool, listSubtasksDefinition, createSubtaskTool, createSubtaskDefinition } from './tools/subtasks.js';
 import { listTodosTool, listTodosDefinition, getTodoTool, getTodoDefinition, createTodoTool, createTodoDefinition, updateTodoTool, updateTodoDefinition, deleteTodoTool, deleteTodoDefinition } from './tools/todos.js';
 import { listPagesTool, listPagesDefinition, getPageTool, getPageDefinition, createPageTool, createPageDefinition, updatePageTool, updatePageDefinition, deletePageTool, deletePageDefinition, movePageTool, movePageDefinition, copyPageTool, copyPageDefinition } from './tools/pages.js';
+import { listPeopleTool, listPeopleDefinition, getPersonTool, getPersonDefinition } from './tools/people.js';
 import { listTaskDependenciesTool, listTaskDependenciesDefinition, getTaskDependencyTool, getTaskDependencyDefinition, createTaskDependencyTool, createTaskDependencyDefinition, deleteTaskDependencyTool, deleteTaskDependencyDefinition } from './tools/task-dependencies.js';
 
 export async function createServer() {
@@ -120,6 +121,9 @@ export async function createServer() {
       deletePageDefinition,
       movePageDefinition,
       copyPageDefinition,
+      // People
+      listPeopleDefinition,
+      getPersonDefinition,
       // Task Dependencies
       listTaskDependenciesDefinition,
       getTaskDependencyDefinition,
@@ -309,6 +313,12 @@ export async function createServer() {
         return await movePageTool(apiClient, args);
       case 'copy_page':
         return await copyPageTool(apiClient, args);
+
+      case 'list_people':
+        return await listPeopleTool(apiClient, args);
+
+      case 'get_person':
+        return await getPersonTool(apiClient, args);
 
       // Task Dependencies
       case 'list_task_dependencies':

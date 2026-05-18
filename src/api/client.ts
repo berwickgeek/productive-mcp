@@ -308,7 +308,11 @@ export class ProductiveAPIClient {
     
     return this.makeRequest<ProductiveResponse<ProductivePerson>>(path);
   }
-  
+
+  async getPerson(personId: string): Promise<ProductiveSingleResponse<ProductivePerson>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductivePerson>>(`people/${personId}`);
+  }
+
   async getTask(taskId: string): Promise<ProductiveSingleResponse<ProductiveTask>> {
     return this.makeRequest<ProductiveSingleResponse<ProductiveTask>>(`tasks/${taskId}`);
   }
