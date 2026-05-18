@@ -10,6 +10,9 @@ dist/
 .env.local
 .env.production
 
+# MCP config (contains API tokens)
+.mcp.json
+
 # Logs
 logs/
 *.log
