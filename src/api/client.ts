@@ -31,6 +31,8 @@ import {
   ProductiveTodoUpdate,
   ProductivePageCreate,
   ProductivePageUpdate,
+  ProductiveTaskDependency,
+  ProductiveTaskDependencyCreate,
   ProductiveError
 } from './types.js';
 
@@ -1085,5 +1087,42 @@ export class ProductiveAPIClient {
         data: { type: 'pages', attributes },
       }),
     });
+  }
+
+  // ---- Task Dependency methods ----
+
+  async listTaskDependencies(params?: {
+    task_id?: string;
+    dependent_task_id?: string;
+    type_id?: number;
+    limit?: number;
+    page?: number;
+  }): Promise<ProductiveResponse<ProductiveTaskDependency>> {
+    const q = new URLSearchParams();
+    q.append('include', 'task,dependent_task');
+    if (params?.task_id) q.append('filter[task_id]', params.task_id);
+    if (params?.dependent_task_id) q.append('filter[dependent_task_id]', params.dependent_task_id);
+    if (params?.type_id) q.append('filter[type_id]', params.type_id.toString());
+    if (params?.limit) q.append('page[size]', params.limit.toString());
+    if (params?.page) q.append('page[number]', params.page.toString());
+    const qs = q.toString();
+    return this.makeRequest<ProductiveResponse<ProductiveTaskDependency>>(`task_dependencies${qs ? `?${qs}` : ''}`);
+  }
+
+  async getTaskDependency(dependencyId: string): Promise<ProductiveSingleResponse<ProductiveTaskDependency>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveTaskDependency>>(
+      `task_dependencies/${dependencyId}?include=task,dependent_task`
+    );
+  }
+
+  async createTaskDependency(data: ProductiveTaskDependencyCreate): Promise<ProductiveSingleResponse<ProductiveTaskDependency>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveTaskDependency>>('task_dependencies', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTaskDependency(dependencyId: string): Promise<void> {
+    return this.makeVoidRequest(`task_dependencies/${dependencyId}`, { method: 'DELETE' });
   }
 }

@@ -683,6 +683,36 @@ export interface ProductiveCommentUpdate {
   };
 }
 
+// ---- Task Dependency types ----
+
+export interface ProductiveTaskDependency {
+  id: string;
+  type: 'task_dependencies';
+  attributes: {
+    type_id: number;
+    created_at?: string;
+    updated_at?: string;
+    [key: string]: unknown;
+  };
+  relationships?: {
+    task?: { data: { id: string; type: 'tasks' } };
+    dependent_task?: { data: { id: string; type: 'tasks' } };
+    reverse_dependency?: { data: { id: string; type: 'task_dependencies' } };
+    [key: string]: unknown;
+  };
+}
+
+export interface ProductiveTaskDependencyCreate {
+  data: {
+    type: 'task_dependencies';
+    attributes: {
+      task_id: string;
+      dependent_task_id: string;
+      type_id: string;
+    };
+  };
+}
+
 // ---- Error types ----
 
 export interface ProductiveError {

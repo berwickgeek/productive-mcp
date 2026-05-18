@@ -251,6 +251,15 @@ Restart Claude Code after configuration.
 | `move_task_to_list` | Move a task to a different task list |
 | `add_to_backlog` | Move a task to the backlog |
 
+### Task Dependency Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_task_dependencies` | List dependencies for a task. Filter by `task_id` (what it blocks) or `dependent_task_id` (what blocks it) |
+| `get_task_dependency` | Get dependency details by `dependency_id` |
+| `create_task_dependency` | Create a dependency. Requires `task_id` (blocker), `dependent_task_id` (blocked). Optional `type_id`: 1 = blocks (default), 2 = is blocked by, 3 = related to |
+| `delete_task_dependency` | Remove a dependency by `dependency_id` |
+
 ### Subtask Tools
 
 | Tool | Description |
