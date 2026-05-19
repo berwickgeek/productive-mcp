@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ProductiveIncludedResource } from '../api/types.js';
+import { resolveMentions, MentionResolutionResult } from '../utils/mentions.js';
 
 type ToolResult = { content: Array<{ type: string; text: string }> };
 
@@ -19,6 +20,25 @@ function truncateBody(body: string, maxLength = 200): string {
   return body.substring(0, maxLength) + '...';
 }
 
+function formatMentionFeedback(result: MentionResolutionResult): string {
+  let feedback = '';
+  if (result.resolved.length > 0) {
+    feedback += `\nMentions resolved: ${result.resolved.map(r => r.token.raw).join(', ')}`;
+  }
+  if (result.unresolved.length > 0) {
+    feedback += `\nWarning - unresolved mentions (left as plain text): ${result.unresolved.map(u => u.raw).join(', ')}`;
+  }
+  return feedback;
+}
+
+function buildAmbiguousError(result: MentionResolutionResult): string {
+  return result.ambiguous.map(a =>
+    `"${a.token.raw}" matches multiple people: ${a.candidates.map(c =>
+      `${c.attributes.first_name} ${c.attributes.last_name} (ID: ${c.id})`
+    ).join(', ')}`
+  ).join('\n');
+}
+
 // ---- Add Task Comment ----
 
 const addTaskCommentSchema = z.object({
@@ -33,11 +53,21 @@ export async function addTaskCommentTool(
   try {
     const params = addTaskCommentSchema.parse(args);
 
+    // Resolve @mentions in comment body
+    const mentionResult = await resolveMentions(params.comment, client);
+
+    if (mentionResult.ambiguous.length > 0) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Ambiguous mentions found:\n${buildAmbiguousError(mentionResult)}\nPlease use full names to disambiguate.`
+      );
+    }
+
     const commentData = {
       data: {
         type: 'comments' as const,
         attributes: {
-          body: params.comment,
+          body: mentionResult.resolvedBody,
         },
         relationships: {
           task: {
@@ -59,6 +89,7 @@ export async function addTaskCommentTool(
     if (response.data.attributes.created_at) {
       text += `\nCreated at: ${response.data.attributes.created_at}`;
     }
+    text += formatMentionFeedback(mentionResult);
 
     return {
       content: [{
@@ -83,7 +114,7 @@ export async function addTaskCommentTool(
 
 export const addTaskCommentDefinition = {
   name: 'add_task_comment',
-  description: 'Add a comment to a task in Productive.io. Supports HTML formatting.',
+  description: 'Add a comment to a task in Productive.io. Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Mentions are automatically resolved to notify the mentioned person.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -93,7 +124,7 @@ export const addTaskCommentDefinition = {
       },
       comment: {
         type: 'string',
-        description: 'Comment content (required). Supports HTML formatting with tags like <div>, <p>, <strong>, <em>, <ul>, <li>, <a href="">.',
+        description: 'Comment content (required). Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Tags: <div>, <p>, <strong>, <em>, <ul>, <li>, <a href="">.',
       },
     },
     required: ['task_id', 'comment'],
@@ -258,20 +289,33 @@ export async function updateCommentTool(
   try {
     const params = updateCommentSchema.parse(args);
 
+    // Resolve @mentions in comment body
+    const mentionResult = await resolveMentions(params.body, client);
+
+    if (mentionResult.ambiguous.length > 0) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Ambiguous mentions found:\n${buildAmbiguousError(mentionResult)}\nPlease use full names to disambiguate.`
+      );
+    }
+
     const response = await client.updateComment(params.comment_id, {
       data: {
         type: 'comments',
         id: params.comment_id,
         attributes: {
-          body: params.body,
+          body: mentionResult.resolvedBody,
         },
       },
     });
 
+    let text = `Comment ${params.comment_id} updated successfully.\nNew body: ${response.data.attributes.body}`;
+    text += formatMentionFeedback(mentionResult);
+
     return {
       content: [{
         type: 'text',
-        text: `Comment ${params.comment_id} updated successfully.\nNew body: ${response.data.attributes.body}`,
+        text,
       }],
     };
   } catch (error) {
@@ -291,7 +335,7 @@ export async function updateCommentTool(
 
 export const updateCommentDefinition = {
   name: 'update_comment',
-  description: 'Update the body of an existing comment in Productive.io.',
+  description: 'Update the body of an existing comment in Productive.io. Supports @mentions (e.g. @Jarrod Lawson) which are automatically resolved.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -301,7 +345,7 @@ export const updateCommentDefinition = {
       },
       body: {
         type: 'string',
-        description: 'The new comment body content (required). Supports HTML formatting.',
+        description: 'The new comment body content (required). Supports HTML formatting and @mentions (e.g. @Jarrod Lawson).',
       },
     },
     required: ['comment_id', 'body'],
