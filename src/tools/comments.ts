@@ -44,6 +44,7 @@ function buildAmbiguousError(result: MentionResolutionResult): string {
 const addTaskCommentSchema = z.object({
   task_id: z.string().min(1, 'Task ID is required'),
   comment: z.string().min(1, 'Comment text is required'),
+  hidden: z.boolean().optional(),
 });
 
 export async function addTaskCommentTool(
@@ -68,6 +69,7 @@ export async function addTaskCommentTool(
         type: 'comments' as const,
         attributes: {
           body: mentionResult.resolvedBody,
+          ...(params.hidden !== undefined ? { hidden: params.hidden } : {}),
         },
         relationships: {
           task: {
@@ -82,10 +84,13 @@ export async function addTaskCommentTool(
 
     const response = await client.createComment(commentData);
 
-    let text = `Comment added successfully!\n`;
+    let text = params.hidden ? `Hidden comment added successfully!\n` : `Comment added successfully!\n`;
     text += `Task ID: ${params.task_id}\n`;
     text += `Comment: ${response.data.attributes.body}\n`;
     text += `Comment ID: ${response.data.id}`;
+    if (response.data.attributes.hidden !== undefined) {
+      text += `\nHidden: ${response.data.attributes.hidden}`;
+    }
     if (response.data.attributes.created_at) {
       text += `\nCreated at: ${response.data.attributes.created_at}`;
     }
@@ -114,7 +119,7 @@ export async function addTaskCommentTool(
 
 export const addTaskCommentDefinition = {
   name: 'add_task_comment',
-  description: 'Add a comment to a task in Productive.io. Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Mentions are automatically resolved to notify the mentioned person.',
+  description: 'Add a comment to a task in Productive.io. Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Mentions are automatically resolved to notify the mentioned person. Set hidden to true to post an internal comment that is not visible to clients in the client portal (hidden comments are not available in internal projects).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -125,6 +130,10 @@ export const addTaskCommentDefinition = {
       comment: {
         type: 'string',
         description: 'Comment content (required). Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Tags: <div>, <p>, <strong>, <em>, <ul>, <li>, <a href="">.',
+      },
+      hidden: {
+        type: 'boolean',
+        description: 'When true, posts a hidden (internal) comment that is not visible to clients in the client portal. Defaults to false. Note: hidden comments are not available in internal projects.',
       },
     },
     required: ['task_id', 'comment'],

@@ -271,7 +271,7 @@ Restart Claude Code after configuration.
 
 | Tool | Description |
 |------|-------------|
-| `add_task_comment` | Add a comment to a task. Requires `task_id`, `comment` (supports HTML) |
+| `add_task_comment` | Add a comment to a task. Requires `task_id`, `comment` (supports HTML and @mentions). Optional `hidden` (boolean) posts an internal comment not visible to clients in the client portal |
 | `list_comments` | List comments. Filter by `task_id`, `project_id`, `limit` |
 | `get_comment` | Get full comment details by `comment_id` |
 | `update_comment` | Edit a comment. Requires `comment_id`, `body` |
