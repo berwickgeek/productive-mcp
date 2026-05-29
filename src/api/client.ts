@@ -218,13 +218,14 @@ export class ProductiveAPIClient {
     }
     
     const queryString = queryParams.toString();
-    const path = `boards${queryString ? `?${queryString}` : ''}`;
-    
+    // Productive renamed /api/v2/boards to /api/v2/folders (old path deprecated 2026-06-07).
+    const path = `folders${queryString ? `?${queryString}` : ''}`;
+
     return this.makeRequest<ProductiveResponse<ProductiveBoard>>(path);
   }
-  
+
   async createBoard(boardData: ProductiveBoardCreate): Promise<ProductiveSingleResponse<ProductiveBoard>> {
-    return this.makeRequest<ProductiveSingleResponse<ProductiveBoard>>('boards', {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveBoard>>('folders', {
       method: 'POST',
       body: JSON.stringify(boardData),
     });

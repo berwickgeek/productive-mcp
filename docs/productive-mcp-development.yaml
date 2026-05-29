@@ -195,8 +195,10 @@ API_ENDPOINTS:
       - PARAM: page[size] (max 200)
   
   BOARDS:
-    ENDPOINT: GET /api/v2/boards
-    CREATE_ENDPOINT: POST /api/v2/boards
+    # Productive renamed /api/v2/boards to /api/v2/folders. Old path deprecated, supported until 2026-06-07.
+    # Rename only: same params, same response structure (JSON:API resource type is still "boards").
+    ENDPOINT: GET /api/v2/folders
+    CREATE_ENDPOINT: POST /api/v2/folders
     FILTERS:
       - NAME: filter[project_id]
         TYPE: string
