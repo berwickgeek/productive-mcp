@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { addTaskCommentTool } from '../comments.js';
+import { addTaskCommentTool, listCommentsTool } from '../comments.js';
 import { ProductiveAPIClient } from '../../api/client.js';
 import { ProductiveComment, ProductiveCommentCreate } from '../../api/types.js';
 
@@ -105,5 +105,38 @@ describe('addTaskCommentTool - hidden parameter', () => {
         hidden: 'yes',
       })
     ).rejects.toThrow(/Invalid parameters/);
+  });
+});
+
+/**
+ * Builds a comment resource for list responses, allowing a null body
+ * (the API returns null for attachment-only or system-generated comments).
+ */
+function makeListedComment(id: string, body: string | null): ProductiveComment {
+  return {
+    id,
+    type: 'comments',
+    attributes: {
+      body,
+      commentable_type: 'task',
+      created_at: '2026-06-10T10:00:00Z',
+      updated_at: '2026-06-10T10:00:00Z',
+    },
+  };
+}
+
+describe('listCommentsTool - null comment bodies', () => {
+  it('renders comments with a null body as (no content) instead of throwing', async () => {
+    const listComments = vi.fn().mockResolvedValue({
+      data: [makeListedComment('1', 'A real comment'), makeListedComment('2', null)],
+    });
+    const client = { listComments } as unknown as ProductiveAPIClient;
+
+    const result = await listCommentsTool(client, { task_id: '18263163' });
+
+    const text = result.content[0].text;
+    expect(text).toContain('Comments (2)');
+    expect(text).toContain('A real comment');
+    expect(text).toContain('(no content)');
   });
 });
