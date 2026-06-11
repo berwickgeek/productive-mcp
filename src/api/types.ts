@@ -311,7 +311,8 @@ export interface ProductiveComment {
   id: string;
   type: 'comments';
   attributes: {
-    body: string;
+    /** Comment body HTML; null for body-less comments (e.g. attachment-only or system-generated). */
+    body: string | null;
     commentable_type: string;
     created_at: string;
     updated_at: string;

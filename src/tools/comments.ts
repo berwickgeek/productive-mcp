@@ -15,7 +15,8 @@ function resolvePersonName(personId: string | undefined, included?: ProductiveIn
   return `${first} ${last}`.trim() || undefined;
 }
 
-function truncateBody(body: string, maxLength = 200): string {
+function truncateBody(body: string | null | undefined, maxLength = 200): string {
+  if (!body) return '(no content)';
   if (body.length <= maxLength) return body;
   return body.substring(0, maxLength) + '...';
 }
@@ -238,7 +239,7 @@ export async function getCommentTool(
     const creatorName = resolvePersonName(creatorId, included) || `Person ${creatorId || 'unknown'}`;
 
     let text = `Comment ID: ${comment.id}\n`;
-    text += `Body: ${attrs.body}\n`;
+    text += `Body: ${attrs.body ?? '(no content)'}\n`;
     text += `Commentable Type: ${attrs.commentable_type}\n`;
     text += `Creator: ${creatorName}\n`;
     text += `Created: ${attrs.created_at}\n`;
