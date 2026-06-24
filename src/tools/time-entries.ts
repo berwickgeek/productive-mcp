@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ProductiveAPIClient } from '../api/client.js';
+import { ProductiveAPIClient, ProductiveApiError } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ProductiveTimeEntryCreate } from '../api/types.js';
 
@@ -376,7 +376,14 @@ ID: ${response.data.id}`;
         `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
       );
     }
-    
+
+    // A 422 from Productive is a data/validation error (e.g. locked timesheet
+    // period, or a task/service not in an open budget) — surface it as invalid
+    // params with the self-diagnosing message (includes the source.pointer).
+    if (error instanceof ProductiveApiError && error.httpStatus === 422) {
+      throw new McpError(ErrorCode.InvalidParams, error.message);
+    }
+
     throw new McpError(
       ErrorCode.InternalError,
       error instanceof Error ? error.message : 'Unknown error occurred'
