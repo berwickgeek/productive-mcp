@@ -3,6 +3,7 @@ import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ProductiveIncludedResource } from '../api/types.js';
 import { resolveMentions, MentionResolutionResult } from '../utils/mentions.js';
+import { formatAttachments } from '../utils/attachments.js';
 
 type ToolResult = { content: Array<{ type: string; text: string }> };
 
@@ -173,8 +174,9 @@ export async function listCommentsTool(
       const creatorName = resolvePersonName(creatorId, response.included) || `Person ${creatorId || 'unknown'}`;
       const pinned = comment.attributes.pinned_at ? ' [PINNED]' : '';
       const body = truncateBody(comment.attributes.body);
+      const attachments = formatAttachments(comment.relationships, response.included, '  ');
 
-      return `- Comment ID: ${comment.id}${pinned}\n  By: ${creatorName}\n  Date: ${comment.attributes.created_at}\n  Body: ${body}`;
+      return `- Comment ID: ${comment.id}${pinned}\n  By: ${creatorName}\n  Date: ${comment.attributes.created_at}\n  Body: ${body}${attachments}`;
     }).join('\n\n');
 
     return {
@@ -251,6 +253,7 @@ export async function getCommentTool(
     text += `Pinned: ${attrs.pinned_at ? `Yes (${attrs.pinned_at})` : 'No'}\n`;
     if (attrs.reactions) text += `Reactions: ${JSON.stringify(attrs.reactions)}\n`;
     if (attrs.version_number !== undefined) text += `Version: ${attrs.version_number}\n`;
+    text += formatAttachments(comment.relationships, included, '');
 
     return {
       content: [{ type: 'text', text }],

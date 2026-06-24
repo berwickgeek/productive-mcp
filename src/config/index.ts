@@ -1,5 +1,7 @@
 import { config } from 'dotenv';
 import { z } from 'zod';
+import os from 'os';
+import path from 'path';
 
 // Silence dotenv output to stdout (MCP requires clean stdout)
 const originalWrite = process.stdout.write;
@@ -16,6 +18,11 @@ const configSchema = z.object({
   PRODUCTIVE_ORG_ID: z.string().min(1, 'Organization ID is required'),
   PRODUCTIVE_USER_ID: z.string().optional(),
   PRODUCTIVE_API_BASE_URL: z.string().url().default('https://api.productive.io/api/v2/'),
+  /** Directory where downloaded attachments are cached. Defaults to an OS-temp subdirectory. */
+  PRODUCTIVE_ATTACHMENT_DIR: z
+    .string()
+    .min(1)
+    .default(path.join(os.tmpdir(), 'productive-mcp-attachments')),
 });
 
 export type Config = z.infer<typeof configSchema>;

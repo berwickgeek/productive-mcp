@@ -140,3 +140,48 @@ describe('listCommentsTool - null comment bodies', () => {
     expect(text).toContain('(no content)');
   });
 });
+
+describe('listCommentsTool - attachments', () => {
+  it('renders attachment metadata (id, name, type, size) without exposing a URL or token', async () => {
+    const comment: ProductiveComment = {
+      id: '5',
+      type: 'comments',
+      attributes: {
+        body: null,
+        commentable_type: 'task',
+        created_at: '2026-06-10T10:00:00Z',
+        updated_at: '2026-06-10T10:00:00Z',
+      },
+      relationships: {
+        attachments: { data: [{ id: '8779231', type: 'attachments' }] },
+      },
+    };
+    const listComments = vi.fn().mockResolvedValue({
+      data: [comment],
+      included: [
+        {
+          id: '8779231',
+          type: 'attachments',
+          attributes: {
+            name: 'image.png',
+            content_type: 'image/png',
+            size: 7035,
+            url: 'https://files.productive.io/attachments/files/008/779/231/original/image.png?1781846603',
+          },
+        },
+      ],
+    });
+    const client = { listComments } as unknown as ProductiveAPIClient;
+
+    const result = await listCommentsTool(client, { task_id: '18263163' });
+
+    const text = result.content[0].text;
+    expect(text).toContain('Attachments (1)');
+    expect(text).toContain('ID 8779231');
+    expect(text).toContain('image.png');
+    expect(text).toContain('image/png');
+    expect(text).toContain('7035 bytes');
+    expect(text).not.toContain('files.productive.io');
+    expect(text).not.toContain('token');
+  });
+});
