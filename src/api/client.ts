@@ -33,8 +33,14 @@ import {
   ProductivePageUpdate,
   ProductiveTaskDependency,
   ProductiveTaskDependencyCreate,
+  ProductiveAttachment,
   ProductiveError
 } from './types.js';
+
+/** Replaces any `token` query-parameter value with a redaction marker so secrets never reach logs. */
+function redactToken(text: string): string {
+  return text.replace(/([?&]token=)[^&\s]+/gi, '$1[REDACTED]');
+}
 
 export class ProductiveAPIClient {
   private config: Config;
@@ -65,8 +71,8 @@ export class ProductiveAPIClient {
 
       if (!response.ok) {
         const errorData = await response.json() as ProductiveError;
-        console.error('API Error Response:', JSON.stringify(errorData, null, 2));
-        console.error('Request was to:', url);
+        console.error('API Error Response:', redactToken(JSON.stringify(errorData, null, 2)));
+        console.error('Request was to:', redactToken(url));
         const errorMessage = errorData.errors?.[0]?.detail || `API request failed with status ${response.status}`;
         throw new Error(errorMessage);
       }
@@ -943,7 +949,7 @@ export class ProductiveAPIClient {
     page?: number;
   }): Promise<ProductiveResponse<ProductiveComment>> {
     const q = new URLSearchParams();
-    q.append('include', 'creator');
+    q.append('include', 'creator,attachments');
     if (params?.task_id) q.append('filter[task_id]', params.task_id);
     if (params?.project_id) q.append('filter[project_id]', params.project_id);
     if (params?.discussion_id) q.append('filter[discussion_id]', params.discussion_id);
@@ -955,7 +961,7 @@ export class ProductiveAPIClient {
   }
 
   async getComment(commentId: string): Promise<ProductiveSingleResponse<ProductiveComment>> {
-    return this.makeRequest<ProductiveSingleResponse<ProductiveComment>>(`comments/${commentId}?include=creator`);
+    return this.makeRequest<ProductiveSingleResponse<ProductiveComment>>(`comments/${commentId}?include=creator,attachments`);
   }
 
   async updateComment(commentId: string, data: ProductiveCommentUpdate): Promise<ProductiveSingleResponse<ProductiveComment>> {
@@ -1125,5 +1131,63 @@ export class ProductiveAPIClient {
 
   async deleteTaskDependency(dependencyId: string): Promise<void> {
     return this.makeVoidRequest(`task_dependencies/${dependencyId}`, { method: 'DELETE' });
+  }
+
+  // ---- Attachment methods ----
+
+  /**
+   * Fetch a single attachment resource (metadata only — name, content_type, size, url).
+   *
+   * @param attachmentId - The ID of the attachment to retrieve
+   * @returns Promise resolving to the attachment resource
+   */
+  async getAttachment(attachmentId: string): Promise<ProductiveSingleResponse<ProductiveAttachment>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveAttachment>>(`attachments/${attachmentId}`);
+  }
+
+  /**
+   * Download an attachment's bytes server-side.
+   *
+   * The API token is injected into the file URL as a `token` query parameter
+   * (the documented method — see https://developer.productive.io/working_with_attachments.html)
+   * and NEVER returned to the caller. Only the decoded bytes and metadata leave this method.
+   *
+   * @param attachmentId - The ID of the attachment to download
+   * @returns The file bytes plus name, content type and size
+   */
+  async downloadAttachment(attachmentId: string): Promise<{
+    name: string;
+    contentType: string;
+    size: number;
+    data: Buffer;
+  }> {
+    const res = await this.getAttachment(attachmentId);
+    const attrs = res.data.attributes;
+    const url = attrs.url;
+
+    if (!url) {
+      throw new Error(`Attachment ${attachmentId} has no downloadable URL.`);
+    }
+
+    const separator = url.includes('?') ? '&' : '?';
+    const downloadUrl = `${url}${separator}token=${this.config.PRODUCTIVE_API_TOKEN}`;
+
+    const response = await fetch(downloadUrl, { redirect: 'follow' });
+
+    if (!response.ok) {
+      // Deliberately omit the URL from the error so the token cannot leak into logs.
+      throw new Error(
+        `Failed to download attachment ${attachmentId}: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+
+    return {
+      name: attrs.name,
+      contentType: attrs.content_type,
+      size: attrs.size,
+      data: Buffer.from(arrayBuffer),
+    };
   }
 }

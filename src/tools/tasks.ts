@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ProductiveTaskUpdate, ProductiveIncludedResource } from '../api/types.js';
+import { formatAttachments } from '../utils/attachments.js';
 
 function resolvePersonName(personId: string | undefined, included?: ProductiveIncludedResource[]): string | undefined {
   if (!personId || !included) return undefined;
@@ -171,7 +172,7 @@ export async function getTaskTool(
     const config = await import('../config/index.js').then(m => m.getConfig());
     
     // Create URL with task_list included
-    const url = `${config.PRODUCTIVE_API_BASE_URL}tasks/${params.task_id}?include=task_list,assignee,workflow_status`;
+    const url = `${config.PRODUCTIVE_API_BASE_URL}tasks/${params.task_id}?include=task_list,assignee,workflow_status,attachments`;
     
     // Create request with proper headers from config
     const response = await fetch(url, {
@@ -269,9 +270,8 @@ export async function getTaskTool(
     // Include task list ID information if available
     if (taskListId) {
       text += `Task List ID: ${taskListId}\n`;
-      
+
     // If there's included data for the task list, include the name
-    console.log('Included data:', JSON.stringify(data.included));
     if (data.included && Array.isArray(data.included)) {
       const taskList = data.included.find((item: any) => item.type === 'task_lists' && item.id === taskListId);
       if (taskList) {
@@ -279,7 +279,9 @@ export async function getTaskTool(
       }
     }
     }
-    
+
+    text += formatAttachments(task.relationships, data.included, '');
+
     return {
       content: [{
         type: 'text',

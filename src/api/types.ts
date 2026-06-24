@@ -67,8 +67,45 @@ export interface ProductiveTask {
         type: 'people';
       };
     };
+    attachments?: {
+      data: Array<{
+        id: string;
+        type: 'attachments';
+      }>;
+    };
     [key: string]: any;
   };
+}
+
+/**
+ * A Productive attachment resource. Polymorphic — attaches to a task, comment,
+ * invoice, etc. (see `attachable_type`). The `url` requires the API token as a
+ * `token` query parameter to download; `temp_url` is an internal storage path
+ * and is NOT directly downloadable.
+ */
+export interface ProductiveAttachment {
+  id: string;
+  type: 'attachments';
+  attributes: {
+    /** Original filename, e.g. "report.pdf". */
+    name: string;
+    /** MIME type, e.g. "application/pdf". */
+    content_type: string;
+    /** File size in bytes. */
+    size: number;
+    /** Authenticated download URL (requires `?token=<API_TOKEN>`). */
+    url: string;
+    /** Internal storage path — NOT directly downloadable. */
+    temp_url?: string;
+    /** Thumbnail URL for images, otherwise null. */
+    thumb?: string | null;
+    /** Parent resource kind: "task" | "comment" | "invoice" | ... */
+    attachable_type?: string;
+    created_at?: string;
+    deleted_at?: string | null;
+    [key: string]: any;
+  };
+  relationships?: Record<string, any>;
 }
 
 export interface ProductiveIncludedResource {
@@ -337,6 +374,12 @@ export interface ProductiveComment {
         id: string;
         type: 'tasks';
       };
+    };
+    attachments?: {
+      data: Array<{
+        id: string;
+        type: 'attachments';
+      }>;
     };
     [key: string]: any;
   };
