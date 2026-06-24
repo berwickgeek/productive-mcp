@@ -42,6 +42,50 @@ function redactToken(text: string): string {
   return text.replace(/([?&]token=)[^&\s]+/gi, '$1[REDACTED]');
 }
 
+/**
+ * Error thrown when the Productive API returns a non-2xx response.
+ *
+ * Preserves the HTTP status and the structured JSON:API `errors` array so
+ * callers can branch on them (e.g. map a 422 to an invalid-params error),
+ * while `message` carries a human-readable, self-diagnosing summary that
+ * includes each error's `title`, `status` and `source.pointer`.
+ */
+export class ProductiveApiError extends Error {
+  /** HTTP status code of the failed response. */
+  readonly httpStatus: number;
+  /** The JSON:API `errors` array from the response body (empty if none/unparseable). */
+  readonly errors: ProductiveError['errors'];
+
+  constructor(message: string, httpStatus: number, errors: ProductiveError['errors']) {
+    super(message);
+    this.name = 'ProductiveApiError';
+    this.httpStatus = httpStatus;
+    this.errors = errors;
+  }
+}
+
+/**
+ * Build a human-readable message from a Productive JSON:API error body,
+ * surfacing `title`, `status` and `source.pointer`/`parameter` for each error
+ * (the `pointer` is the field that says which attribute Productive rejected).
+ */
+function formatProductiveError(errorData: ProductiveError | undefined, httpStatus: number): string {
+  const errs = errorData?.errors;
+  if (!errs || errs.length === 0) {
+    return `API request failed with status ${httpStatus}`;
+  }
+  return errs
+    .map((e) => {
+      const title = e.title || 'API error';
+      const code = e.status || String(httpStatus);
+      const detail = e.detail ? `: ${e.detail}` : '';
+      const pointer = e.source?.pointer ? ` [at ${e.source.pointer}]` : '';
+      const parameter = e.source?.parameter ? ` [param ${e.source.parameter}]` : '';
+      return `${title} (${code})${detail}${pointer}${parameter}`;
+    })
+    .join('; ');
+}
+
 export class ProductiveAPIClient {
   private config: Config;
   
@@ -70,11 +114,14 @@ export class ProductiveAPIClient {
       });
 
       if (!response.ok) {
-        const errorData = await response.json() as ProductiveError;
-        console.error('API Error Response:', redactToken(JSON.stringify(errorData, null, 2)));
+        const errorData = await response.json().catch(() => undefined) as ProductiveError | undefined;
+        console.error('API Error Response:', redactToken(JSON.stringify(errorData ?? {}, null, 2)));
         console.error('Request was to:', redactToken(url));
-        const errorMessage = errorData.errors?.[0]?.detail || `API request failed with status ${response.status}`;
-        throw new Error(errorMessage);
+        throw new ProductiveApiError(
+          formatProductiveError(errorData, response.status),
+          response.status,
+          errorData?.errors ?? []
+        );
       }
 
       return await response.json() as T;
@@ -98,12 +145,12 @@ export class ProductiveAPIClient {
     });
 
     if (!response.ok) {
-      let errorMessage = `API request failed with status ${response.status}`;
-      try {
-        const errorData = await response.json() as ProductiveError;
-        errorMessage = errorData.errors?.[0]?.detail || errorMessage;
-      } catch { /* no JSON body */ }
-      throw new Error(errorMessage);
+      const errorData = await response.json().catch(() => undefined) as ProductiveError | undefined;
+      throw new ProductiveApiError(
+        formatProductiveError(errorData, response.status),
+        response.status,
+        errorData?.errors ?? []
+      );
     }
   }
   
