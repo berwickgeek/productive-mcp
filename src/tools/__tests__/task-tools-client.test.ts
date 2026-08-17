@@ -14,6 +14,7 @@ import { getTaskTool } from '../tasks.js';
 import { listSubtasksTool } from '../subtasks.js';
 import { updateTaskStatusTool } from '../task-status.js';
 import { ProductiveAPIClient, ProductiveApiError } from '../../api/client.js';
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /** A 403 carrying the structured detail a raw `response.statusText` would have thrown away. */
 const diagnosticError = new ProductiveApiError(
@@ -22,8 +23,25 @@ const diagnosticError = new ProductiveApiError(
   [{ status: '403', title: 'Forbidden', detail: 'you do not have access to this task', source: { pointer: '/data/relationships/project' } }]
 );
 
+/** A 404 from passing a task ID that does not exist: the caller's fault, not the server's. */
+const notFoundError = new ProductiveApiError(
+  'Record Not Found (404): The requested record was not found',
+  404,
+  [{ status: '404', title: 'Record Not Found', detail: 'The requested record was not found' }]
+);
+
 function mockClient(overrides: Record<string, unknown>): ProductiveAPIClient {
   return overrides as unknown as ProductiveAPIClient;
+}
+
+/** Runs `fn` and returns the McpError it threw. */
+async function codeOf(fn: () => Promise<unknown>): Promise<McpError> {
+  try {
+    await fn();
+  } catch (err) {
+    return err as McpError;
+  }
+  throw new Error('expected a throw, got none');
 }
 
 describe('getTaskTool', () => {
@@ -164,6 +182,59 @@ describe('updateTaskStatusTool', () => {
 
     expect(caught.message).toContain('you do not have access to this task');
     expect(caught.message).toContain('/data/relationships/project');
+  });
+});
+
+describe('error codes at the tool boundary', () => {
+  // Before this, all three collapsed every failure into InternalError, so a caller could not
+  // tell "you passed an ID that does not exist" from "Productive fell over".
+  it('reports a bad task_id as InvalidParams from get_task', async () => {
+    const err = await codeOf(() =>
+      getTaskTool(mockClient({ getTask: vi.fn().mockRejectedValue(notFoundError) }), { task_id: '1' })
+    );
+
+    expect(err.code).toBe(ErrorCode.InvalidParams);
+    expect(err.message).toContain('Record Not Found');
+  });
+
+  it('reports a bad parent_task_id as InvalidParams from list_subtasks', async () => {
+    const err = await codeOf(() =>
+      listSubtasksTool(mockClient({ listTasks: vi.fn().mockRejectedValue(notFoundError) }), { parent_task_id: '1' })
+    );
+
+    expect(err.code).toBe(ErrorCode.InvalidParams);
+  });
+
+  it('reports a rejected status change as InvalidParams from update_task_status', async () => {
+    const rejected = new ProductiveApiError('Invalid relationship (422): not on this workflow', 422, [
+      { status: '422', title: 'Invalid relationship' },
+    ]);
+    const err = await codeOf(() =>
+      updateTaskStatusTool(mockClient({ updateTask: vi.fn().mockRejectedValue(rejected) }), {
+        task_id: '19300600',
+        workflow_status_id: '999',
+      })
+    );
+
+    expect(err.code).toBe(ErrorCode.InvalidParams);
+  });
+
+  it('still reports a permission failure as InternalError, not the caller\'s fault', async () => {
+    const err = await codeOf(() =>
+      getTaskTool(mockClient({ getTask: vi.fn().mockRejectedValue(diagnosticError) }), { task_id: '1' })
+    );
+
+    expect(err.code).toBe(ErrorCode.InternalError);
+    expect(err.message).toContain('you do not have access to this task');
+  });
+
+  it('keeps update_task_status\'s own argument check as InvalidParams', async () => {
+    const err = await codeOf(() =>
+      updateTaskStatusTool(mockClient({}), { task_id: '19300600' })
+    );
+
+    expect(err.code).toBe(ErrorCode.InvalidParams);
+    expect(err.message).toContain('workflow_status_id or status_name');
   });
 });
 
