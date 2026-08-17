@@ -355,7 +355,7 @@ export const getProjectTasksDefinition = {
 
 export const getTaskDefinition = {
   name: 'get_task',
-  description: 'Get detailed information about a specific task by ID. Returns metadata only, with no comment history. To understand an issue you have been given the ID for, prefer get_task_overview, which returns this metadata plus the full recent comment thread and an attachment index in a single call.',
+  description: 'NOT the tool for reading or understanding a task. Call get_task_overview instead: it covers this tool\'s common fields (title, status, assignee, project, task list, dates, estimate vs worked time) and adds the full comment thread and an attachment index, in the same single call. Calling get_task first and get_task_overview afterwards is always a wasted round trip. Use get_task ONLY for a field the overview omits (updated_at, priority, placement) or to re-check one field on a task whose thread you have already read.',
   inputSchema: {
     type: 'object',
     properties: {
