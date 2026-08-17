@@ -85,9 +85,12 @@ the gate is a speed bump, not authorisation.
 
 - Destructive tools take `confirm` (defaulting to false, never `required`). The first call
   looks the record up, describes it, and returns without deleting. See `src/utils/confirm.ts`.
-- Errors go through `toMcpError` (`src/utils/errors.ts`): 400, 404 and 422 become
-  `InvalidParams`, everything else `InternalError`. `time-entries.ts` still has its own inline
-  422 check and is the last holdout.
+- Errors should go through `toMcpError` (`src/utils/errors.ts`): 400, 404 and 422 become
+  `InvalidParams`, everything else `InternalError`. This is **partially migrated**. Roughly 70
+  handlers across 19 files still map inline, collapsing everything to `InternalError`, so a
+  bad argument is indistinguishable from a server fault. Files are mixed: a file using
+  `toMcpError` in one tool often still maps inline in another. When you touch a handler,
+  convert it.
 - Tool descriptions carry cross-tool routing where it matters, but a description cannot
   express "call A before B", because a model weighs each one alone and the literal name match
   wins. Server-level routing rules belong in `server-instructions.ts`.

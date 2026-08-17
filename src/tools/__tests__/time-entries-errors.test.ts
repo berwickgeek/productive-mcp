@@ -59,4 +59,46 @@ describe('createTimeEntryTool - error mapping', () => {
     expect(caught.code).toBe(ErrorCode.InternalError);
     expect(caught.message).toContain('500');
   });
+
+  // This file used to check only for 422 inline, so a bad service_id or task_id came back as
+  // InternalError and read as a server fault rather than a wrong argument.
+  it('maps a 404 to InvalidParams now that it shares toMcpError', async () => {
+    const apiError = new ProductiveApiError(
+      'Record Not Found (404): The requested record was not found',
+      404,
+      [{ status: '404', title: 'Record Not Found' }]
+    );
+
+    let caught: any;
+    try {
+      await createTimeEntryTool(clientThatThrows(apiError), validArgs);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught.code).toBe(ErrorCode.InvalidParams);
+    expect(caught.message).toContain('Record Not Found');
+  });
+
+  it('still refuses to create without confirmation', async () => {
+    const createTimeEntry = vi.fn();
+    const client = { createTimeEntry } as unknown as ProductiveAPIClient;
+
+    const result = await createTimeEntryTool(client, { ...validArgs, confirm: false });
+
+    expect(createTimeEntry).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('confirm');
+  });
+
+  it('keeps the "me" rejection as InvalidParams rather than re-wrapping it', async () => {
+    let caught: any;
+    try {
+      await createTimeEntryTool(clientThatThrows(new Error('unused')), { ...validArgs, person_id: 'me' }, {});
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught.code).toBe(ErrorCode.InvalidParams);
+    expect(caught.message).toContain('PRODUCTIVE_USER_ID');
+  });
 });
