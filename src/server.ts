@@ -4,6 +4,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema, ListPromptsRequestSchema
 import { z } from 'zod';
 import { getConfig } from './config/index.js';
 import { SERVER_INFO, buildServerOptions } from './server-instructions.js';
+import { withAnnotations } from './tools/annotations.js';
 import { ProductiveAPIClient } from './api/client.js';
 import { listProjectsTool, listProjectsDefinition } from './tools/projects.js';
 import { listTasksTool, getProjectTasksTool, getTaskTool, createTaskTool, updateTaskAssignmentTool, updateTaskDetailsTool, deleteTaskTool, listTasksDefinition, getProjectTasksDefinition, getTaskDefinition, createTaskDefinition, updateTaskAssignmentDefinition, updateTaskDetailsDefinition, deleteTaskDefinition } from './tools/tasks.js';
@@ -130,7 +131,7 @@ export async function createServer() {
   
   // Register handlers
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: toolDefinitions,
+    tools: withAnnotations(toolDefinitions),
   }));
   
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
