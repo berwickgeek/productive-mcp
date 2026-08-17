@@ -46,6 +46,50 @@ export function extractMentionTokens(body: string): MentionToken[] {
   return tokens;
 }
 
+/**
+ * Matches a stored mention blob, e.g. `@[{"type":"person","label":"Jay M",...}]`.
+ * Kept deliberately tolerant so a malformed blob is left alone rather than mangled.
+ */
+const STORED_MENTION_REGEX = /@\[(\{[^\]]*\})\]/g;
+
+/**
+ * Render stored mention blobs back into readable text.
+ *
+ * Productive persists both people mentions and inline attachments as an inline
+ * JSON object. That is machine-readable but wastes a lot of tokens and is
+ * unreadable when a body is shown to a person, so collapse each blob:
+ *
+ * - `type: "person"` becomes `@Label`.
+ * - `type: "inline_attachment"` becomes a pointer carrying the attachment ID,
+ *   so a reader can see exactly where in the thread a screenshot sits and can
+ *   fetch it with `get_attachment` without hunting for the ID.
+ *
+ * Blobs that fail to parse are left verbatim.
+ *
+ * @param body - Comment or description text that may contain mention blobs
+ * @returns The same text with each blob rendered as readable text
+ */
+export function renderStoredMentions(body: string | null | undefined): string {
+  if (!body) return '';
+
+  return body.replace(STORED_MENTION_REGEX, (match, json: string) => {
+    try {
+      const parsed = JSON.parse(json) as { type?: string; id?: string; label?: string };
+      if (!parsed.label) return match;
+
+      if (parsed.type === 'inline_attachment') {
+        return parsed.id
+          ? `[attachment ${parsed.id}: ${parsed.label}]`
+          : `[attachment: ${parsed.label}]`;
+      }
+
+      return `@${parsed.label}`;
+    } catch {
+      return match;
+    }
+  });
+}
+
 export function buildMentionReplacement(person: ProductivePerson): string {
   const mention = {
     type: 'person',

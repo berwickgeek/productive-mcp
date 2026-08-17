@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { extractMentionTokens, buildMentionReplacement, resolveMentions } from '../mentions.js';
+import { extractMentionTokens, buildMentionReplacement, resolveMentions, renderStoredMentions } from '../mentions.js';
 import { ProductivePerson } from '../../api/types.js';
 import { ProductiveAPIClient } from '../../api/client.js';
 
@@ -274,5 +274,39 @@ describe('resolveMentions', () => {
 
     expect(result.resolved).toHaveLength(1);
     expect(result.resolved[0].person.id).toBe('698785');
+  });
+});
+
+describe('renderStoredMentions', () => {
+  it('renders a person blob as an @Label mention', () => {
+    const body =
+      '<p>@[{"type":"person","id":"705374","label":"Julian Smith","avatar_url":null,"attachment_url":null,"is_done":false}] please review</p>';
+    expect(renderStoredMentions(body)).toBe('<p>@Julian Smith please review</p>');
+  });
+
+  it('renders an inline attachment blob as a pointer carrying the attachment ID', () => {
+    const body =
+      '<p>@[{"type":"inline_attachment","id":"9131629","label":"Screenshot.png","avatar_url":null,"attachment_url":"https://files.productive.io/x.png","is_done":false}]</p>';
+    expect(renderStoredMentions(body)).toBe('<p>[attachment 9131629: Screenshot.png]</p>');
+  });
+
+  it('renders several blobs of mixed type in one body', () => {
+    const body =
+      '@[{"type":"person","label":"Jay M"}] see @[{"type":"inline_attachment","id":"12","label":"err.png"}]';
+    expect(renderStoredMentions(body)).toBe('@Jay M see [attachment 12: err.png]');
+  });
+
+  it('leaves an unparseable blob verbatim', () => {
+    const body = '@[{not valid json}]';
+    expect(renderStoredMentions(body)).toBe('@[{not valid json}]');
+  });
+
+  it('returns an empty string for null and undefined', () => {
+    expect(renderStoredMentions(null)).toBe('');
+    expect(renderStoredMentions(undefined)).toBe('');
+  });
+
+  it('leaves text without blobs untouched', () => {
+    expect(renderStoredMentions('plain body @NotAMention')).toBe('plain body @NotAMention');
   });
 });

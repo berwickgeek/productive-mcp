@@ -6,6 +6,7 @@ An MCP (Model Context Protocol) server that enables Claude Desktop, Claude Code,
 
 ## Features
 
+- **Task Briefing**: `get_task_overview` returns everything about one task in a single call, so reading an issue does not cost a dozen round trips
 - **Companies & Projects**: List companies and projects with status filtering
 - **Folders**: Full CRUD with archive/restore for organizing project content
 - **Task Lists**: Full lifecycle management — create, update, archive/restore, copy, move, reposition
@@ -193,6 +194,33 @@ Restart Claude Code after configuration.
 
 ## Available Tools
 
+### Reading a task you have been given the ID for
+
+Use `get_task_overview` first. It answers "what is this issue about" in one call:
+
+```
+get_task_overview(task_id: "19300600")
+```
+
+It returns metadata (status, assignee, project, task list, dates, estimate vs worked time),
+the full original description, then the 10 most recent comments with their complete bodies in
+chronological order. HTML is rendered to plain text and stored `@mention` blobs are collapsed
+to names, so the thread reads as prose.
+
+Attachments are surfaced two ways, because most of them are screenshots that carry the
+context you need:
+
+- **Inline**, at the exact point in the comment where the screenshot was posted, as
+  `[attachment 9131629: Screenshot_2026-07-31_110620.png]`.
+- **Indexed**, in an `ATTACHMENTS` block at the end listing every attachment on the task and
+  on the comments shown, flagged `[IMAGE]`, with the source comment and author.
+
+Then fetch only the ones that matter with `get_attachment(attachment_id: "9131629")`, which
+returns images inline.
+
+The older path (`get_task`, then `list_comments`, then a `get_comment` per truncated comment)
+still works, but costs one round trip per comment and truncates bodies to 200 characters.
+
 ### User & Context Tools
 
 | Tool | Description |
@@ -237,9 +265,10 @@ Restart Claude Code after configuration.
 
 | Tool | Description |
 |------|-------------|
+| `get_task_overview` | **Start here for any task ID.** One call returns metadata, the full description, the most recent comments in full (default 10, `comment_limit` up to 50) oldest-first, and an index of every attachment on the task and those comments. Requires `task_id` |
 | `list_tasks` | List tasks. Filter by `project_id`, `assignee_id`, `status` (open/closed), `limit` |
 | `get_project_tasks` | Get all tasks for a project. Requires `project_id`, optional `status` |
-| `get_task` | Get task details by `task_id` |
+| `get_task` | Get task details by `task_id`. Metadata only, no comments. Prefer `get_task_overview` |
 | `create_task` | Create a task. Requires `title`. Optional `project_id`, `board_id`, `task_list_id`, `assignee_id` ("me" supported), `due_date`, `status` |
 | `update_task_assignment` | Assign/unassign a task. Requires `task_id`, `assignee_id` ("me" or "null" supported) |
 | `update_task_details` | Update title/description. Requires `task_id`, optional `title`, `description`, `description_html` |
@@ -272,7 +301,7 @@ Restart Claude Code after configuration.
 | Tool | Description |
 |------|-------------|
 | `add_task_comment` | Add a comment to a task. Requires `task_id`, `comment` (supports HTML and @mentions). Optional `hidden` (boolean) posts an internal comment not visible to clients in the client portal |
-| `list_comments` | List comments. Filter by `task_id`, `project_id`, `limit` |
+| `list_comments` | List comments. Filter by `task_id`, `project_id`, `limit`. Bodies are truncated to 200 chars; to read a task's thread use `get_task_overview` instead |
 | `get_comment` | Get full comment details by `comment_id` |
 | `update_comment` | Edit a comment. Requires `comment_id`, `body` |
 | `delete_comment` | Delete a comment by `comment_id` |
