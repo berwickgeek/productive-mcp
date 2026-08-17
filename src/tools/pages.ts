@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
+import { confirmField, confirmProperty, deletionPreview, excerpt } from '../utils/confirm.js';
 
 // ---- Schemas ----
 
@@ -30,6 +32,7 @@ const updatePageSchema = z.object({
 
 const deletePageSchema = z.object({
   page_id: z.string().min(1, 'Page ID is required'),
+  confirm: confirmField,
 });
 
 const movePageSchema = z.object({
@@ -262,6 +265,20 @@ export async function deletePageTool(
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
     const params = deletePageSchema.parse(args);
+    if (!params.confirm) {
+      // Fetching first means a wrong ID fails here, before anything is destroyed.
+      const { data: record } = await client.getPage(params.page_id);
+      return deletionPreview({
+        tool: 'delete_page',
+        kind: 'page',
+        id: params.page_id,
+        details: [
+          `Title: ${record.attributes.title}`,
+          excerpt(record.attributes.body),
+        ],
+      });
+    }
+
     await client.deletePage(params.page_id);
 
     return {
@@ -271,17 +288,7 @@ export async function deletePageTool(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-
-    throw new McpError(
-      ErrorCode.InternalError,
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    );
+    throw toMcpError(error);
   }
 }
 
@@ -446,7 +453,7 @@ export const updatePageDefinition = {
 
 export const deletePageDefinition = {
   name: 'delete_page',
-  description: 'Delete a page/document from Productive.io.',
+  description: 'Delete a page/document from Productive.io. Requires confirmation: the first call only reports what would be deleted, and nothing is removed until you call again with "confirm": true.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -454,6 +461,7 @@ export const deletePageDefinition = {
         type: 'string',
         description: 'ID of the page to delete (required)',
       },
+      confirm: confirmProperty,
     },
     required: ['page_id'],
   },

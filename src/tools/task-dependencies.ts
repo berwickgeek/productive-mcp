@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
+import { confirmField, confirmProperty, deletionPreview, excerpt } from '../utils/confirm.js';
 import { ProductiveIncludedResource } from '../api/types.js';
 
 function resolveTaskTitle(taskId: string | undefined, included?: ProductiveIncludedResource[]): string | undefined {
@@ -38,6 +40,7 @@ const createTaskDependencySchema = z.object({
 
 const deleteTaskDependencySchema = z.object({
   dependency_id: z.string().min(1, 'Dependency ID is required'),
+  confirm: confirmField,
 });
 
 // ---- Handlers ----
@@ -162,6 +165,21 @@ export async function deleteTaskDependencyTool(
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
     const params = deleteTaskDependencySchema.parse(args);
+    if (!params.confirm) {
+      // Fetching first means a wrong ID fails here, before anything is destroyed.
+      const { data: record } = await client.getTaskDependency(params.dependency_id);
+      return deletionPreview({
+        tool: 'delete_task_dependency',
+        kind: 'task dependency',
+        id: params.dependency_id,
+        details: [
+          `Task ID: ${record.relationships?.task?.data?.id ?? 'unknown'}`,
+          `Dependent task ID: ${record.relationships?.dependent_task?.data?.id ?? 'unknown'}`,
+          `Type: ${dependencyTypeLabel(record.attributes.type_id)}`,
+        ],
+      });
+    }
+
     await client.deleteTaskDependency(params.dependency_id);
 
     return {
@@ -171,10 +189,7 @@ export async function deleteTaskDependencyTool(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(ErrorCode.InvalidParams, `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`);
-    }
-    throw new McpError(ErrorCode.InternalError, error instanceof Error ? error.message : 'Unknown error occurred');
+    throw toMcpError(error);
   }
 }
 
@@ -243,7 +258,7 @@ export const createTaskDependencyDefinition = {
 
 export const deleteTaskDependencyDefinition = {
   name: 'delete_task_dependency',
-  description: 'Delete a task dependency by ID.',
+  description: 'Delete a task dependency by ID. Requires confirmation: the first call only reports what would be deleted, and nothing is removed until you call again with "confirm": true.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -251,6 +266,7 @@ export const deleteTaskDependencyDefinition = {
         type: 'string',
         description: 'ID of the task dependency to delete (required)',
       },
+      confirm: confirmProperty,
     },
     required: ['dependency_id'],
   },

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { toMcpError } from '../utils/errors.js';
+import { confirmField, confirmProperty, deletionPreview } from '../utils/confirm.js';
 import { ProductiveTaskUpdate, ProductiveIncludedResource } from '../api/types.js';
 import { formatAttachments } from '../utils/attachments.js';
 
@@ -740,6 +741,7 @@ export const updateTaskDetailsDefinition = {
 
 const deleteTaskSchema = z.object({
   task_id: z.string().min(1, 'Task ID is required'),
+  confirm: confirmField,
 });
 
 export async function deleteTaskTool(
@@ -748,6 +750,24 @@ export async function deleteTaskTool(
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
     const params = deleteTaskSchema.parse(args);
+
+    if (!params.confirm) {
+      // Fetching first means a wrong ID fails here, before anything is destroyed.
+      const { data: task } = await client.getTask(params.task_id, 'assignee,workflow_status');
+      return deletionPreview({
+        tool: 'delete_task',
+        kind: 'task',
+        id: params.task_id,
+        details: [
+          `Title: ${task.attributes.title}`,
+          task.attributes.task_number ? `Task number: ${task.attributes.task_number}` : undefined,
+          task.relationships?.project?.data?.id
+            ? `Project ID: ${task.relationships.project.data.id}`
+            : undefined,
+          task.attributes.closed === false ? 'Status: open' : undefined,
+        ],
+      });
+    }
 
     await client.deleteTask(params.task_id);
 
@@ -758,23 +778,13 @@ export async function deleteTaskTool(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-
-    throw new McpError(
-      ErrorCode.InternalError,
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    );
+    throw toMcpError(error);
   }
 }
 
 export const deleteTaskDefinition = {
   name: 'delete_task',
-  description: 'Delete a task from Productive.io by its ID',
+  description: 'Delete a task from Productive.io by its ID. Requires confirmation: the first call only reports what would be deleted, and nothing is removed until you call again with "confirm": true.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -782,6 +792,7 @@ export const deleteTaskDefinition = {
         type: 'string',
         description: 'The ID of the task to delete (required)',
       },
+      confirm: confirmProperty,
     },
     required: ['task_id'],
   },
