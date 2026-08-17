@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
+import { confirmField, confirmProperty, deletionPreview, excerpt } from '../utils/confirm.js';
 import { ProductiveIncludedResource } from '../api/types.js';
 import { resolveMentions, MentionResolutionResult } from '../utils/mentions.js';
 import { formatAttachments } from '../utils/attachments.js';
@@ -369,6 +371,7 @@ export const updateCommentDefinition = {
 
 const deleteCommentSchema = z.object({
   comment_id: z.string().min(1, 'Comment ID is required'),
+  confirm: confirmField,
 });
 
 export async function deleteCommentTool(
@@ -377,6 +380,22 @@ export async function deleteCommentTool(
 ): Promise<ToolResult> {
   try {
     const params = deleteCommentSchema.parse(args);
+
+    if (!params.confirm) {
+      // Fetching first means a wrong ID fails here, before anything is destroyed.
+      const { data: record } = await client.getComment(params.comment_id);
+      return deletionPreview({
+        tool: 'delete_comment',
+        kind: 'comment',
+        id: params.comment_id,
+        details: [
+          excerpt(record.attributes.body) ?? '(no body)',
+          `On: ${record.attributes.commentable_type} ${record.relationships?.task?.data?.id ?? ''}`.trim(),
+          `Created: ${record.attributes.created_at}`,
+        ],
+      });
+    }
+
 
     await client.deleteComment(params.comment_id);
 
@@ -387,23 +406,13 @@ export async function deleteCommentTool(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-
-    throw new McpError(
-      ErrorCode.InternalError,
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    );
+    throw toMcpError(error);
   }
 }
 
 export const deleteCommentDefinition = {
   name: 'delete_comment',
-  description: 'Delete a comment by ID from Productive.io.',
+  description: 'Delete a comment by ID from Productive.io. Requires confirmation: the first call only reports what would be deleted, and nothing is removed until you call again with "confirm": true.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -411,6 +420,7 @@ export const deleteCommentDefinition = {
         type: 'string',
         description: 'The ID of the comment to delete (required)',
       },
+      confirm: confirmProperty,
     },
     required: ['comment_id'],
   },

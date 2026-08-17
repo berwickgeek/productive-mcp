@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
+import { confirmField, confirmProperty, deletionPreview, excerpt } from '../utils/confirm.js';
 
 // ---- Schemas ----
 
@@ -31,6 +33,7 @@ const updateTodoSchema = z.object({
 
 const deleteTodoSchema = z.object({
   todo_id: z.string().min(1, 'Todo ID is required'),
+  confirm: confirmField,
 });
 
 // ---- Handlers ----
@@ -237,22 +240,28 @@ export async function deleteTodoTool(
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
     const params = deleteTodoSchema.parse(args);
+    if (!params.confirm) {
+      // Fetching first means a wrong ID fails here, before anything is destroyed.
+      const { data: record } = await client.getTodo(params.todo_id);
+      return deletionPreview({
+        tool: 'delete_todo',
+        kind: 'todo',
+        id: params.todo_id,
+        details: [
+          `Description: ${record.attributes.description}`,
+          record.attributes.closed ? 'Status: closed' : 'Status: open',
+          record.attributes.due_date ? `Due: ${record.attributes.due_date}` : undefined,
+        ],
+      });
+    }
+
     await client.deleteTodo(params.todo_id);
 
     return {
       content: [{ type: 'text', text: `Todo ${params.todo_id} deleted successfully.` }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-    throw new McpError(
-      ErrorCode.InternalError,
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    );
+    throw toMcpError(error);
   }
 }
 
@@ -357,7 +366,7 @@ export const updateTodoDefinition = {
 
 export const deleteTodoDefinition = {
   name: 'delete_todo',
-  description: 'Delete a todo from Productive.io.',
+  description: 'Delete a todo from Productive.io. Requires confirmation: the first call only reports what would be deleted, and nothing is removed until you call again with "confirm": true.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -365,6 +374,7 @@ export const deleteTodoDefinition = {
         type: 'string',
         description: 'ID of the todo to delete (required)',
       },
+      confirm: confirmProperty,
     },
     required: ['todo_id'],
   },
