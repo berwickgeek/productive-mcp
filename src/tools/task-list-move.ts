@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
 
 const moveTaskToListSchema = z.object({
   task_id: z.string().describe('ID of the task to move'),
@@ -37,13 +37,7 @@ export async function moveTaskToList(
       }]
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-    throw error;
+    throw toMcpError(error);
   }
 }
 

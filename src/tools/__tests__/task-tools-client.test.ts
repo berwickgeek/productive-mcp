@@ -248,4 +248,15 @@ describe('tool layer', () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it('never maps errors inline, so a caller fault is never reported as a server fault', () => {
+    // task-reposition.ts returns its errors as plain text instead of throwing, a separate
+    // known bug. It is excluded here so this guard stays about error *codes*.
+    const toolsDir = fileURLToPath(new URL('..', import.meta.url));
+    const offenders = readdirSync(toolsDir)
+      .filter(f => f.endsWith('.ts') && f !== 'task-reposition.ts')
+      .filter(f => readFileSync(join(toolsDir, f), 'utf8').includes('ErrorCode.InternalError'));
+
+    expect(offenders).toEqual([]);
+  });
 });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
 
 const listCompaniesSchema = z.object({
   status: z.enum(['active', 'archived']).optional(),
@@ -48,17 +48,7 @@ export async function listCompaniesTool(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-    
-    throw new McpError(
-      ErrorCode.InternalError,
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    );
+    throw toMcpError(error);
   }
 }
 

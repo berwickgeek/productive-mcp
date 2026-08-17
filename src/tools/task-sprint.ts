@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { ProductiveTask } from '../api/types.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
 
 // Sprint mapping: S01-S10 to their corresponding IDs
 const SPRINT_MAPPING: Record<string, string> = {
@@ -108,13 +109,7 @@ export async function updateTaskSprint(
       }]
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-    throw error;
+    throw toMcpError(error);
   }
 }
 
