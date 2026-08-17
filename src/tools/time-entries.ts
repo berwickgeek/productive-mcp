@@ -77,7 +77,7 @@ const createTimeEntrySchema = z.object({
   time: z.string().min(1, 'Time is required'),
   person_id: z.string().min(1, 'Person ID is required'),
   service_id: z.string().min(1, 'Service ID is required'),
-  task_id: z.string().optional().describe('Optional task ID - use list_project_tasks to find available tasks for the project'),
+  task_id: z.string().optional().describe('Optional task ID - use get_project_tasks to find available tasks for the project'),
   note: z.string().min(10, 'Work description must be at least 10 characters').describe('REQUIRED: Detailed description of work performed - be specific about what was accomplished, including bullet points if multiple items'),
   billable_time: z.string().optional(),
   confirm: z.boolean().optional().default(false),
@@ -549,7 +549,7 @@ export const listTimeEntriesDefinition = {
 
 export const createTimeEntryDefinition = {
   name: 'create_time_entry',
-  description: 'STEP 5 (FINAL) of timesheet workflow: Create a time entry with detailed work description. COMPLETE WORKFLOW: 1) list_projects → 2) list_project_deals → 3) list_deal_services → 4) list_project_tasks (recommended) → 5) create_time_entry. You MUST provide: valid service_id from the hierarchy, detailed work notes (minimum 10 chars), and optionally link to a specific task_id. This tool requires confirmation before creating. If PRODUCTIVE_USER_ID is configured, use "me" for person_id.',
+  description: 'STEP 5 (FINAL) of timesheet workflow: Create a time entry with detailed work description. COMPLETE WORKFLOW: 1) list_projects → 2) list_project_deals → 3) list_deal_services → 4) get_project_tasks (recommended) → 5) create_time_entry. You MUST provide: valid service_id from the hierarchy, detailed work notes (minimum 10 chars), and optionally link to a specific task_id. This tool requires confirmation before creating. If PRODUCTIVE_USER_ID is configured, use "me" for person_id.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -571,7 +571,7 @@ export const createTimeEntryDefinition = {
       },
       task_id: {
         type: 'string',
-        description: 'ID of the task being worked on (recommended - use list_project_tasks to find available tasks)',
+        description: 'ID of the task being worked on (recommended - use get_project_tasks to find available tasks)',
       },
       note: {
         type: 'string',
@@ -738,7 +738,7 @@ export async function listDealServicesTool(
 
 export const listProjectDealsDefinition = {
   name: 'list_project_deals',
-  description: 'STEP 2 of timesheet workflow: Get deals/budgets for a specific project. COMPLETE WORKFLOW: 1) list_projects → 2) list_project_deals → 3) list_deal_services → 4) list_project_tasks (recommended) → 5) create_time_entry. This follows: Project → Deal/Budget → Service → Task → Time Entry.',
+  description: 'STEP 2 of timesheet workflow: Get deals/budgets for a specific project. COMPLETE WORKFLOW: 1) list_projects → 2) list_project_deals → 3) list_deal_services → 4) get_project_tasks (recommended) → 5) create_time_entry. This follows: Project → Deal/Budget → Service → Task → Time Entry.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -766,7 +766,7 @@ export const listProjectDealsDefinition = {
 
 export const listDealServicesDefinition = {
   name: 'list_deal_services',
-  description: 'STEP 3 of timesheet workflow: Get services for a specific deal/budget. COMPLETE WORKFLOW: 1) list_projects → 2) list_project_deals → 3) list_deal_services → 4) list_project_tasks (recommended) → 5) create_time_entry. After this, optionally use list_project_tasks to find specific tasks to link your time entry to.',
+  description: 'STEP 3 of timesheet workflow: Get services for a specific deal/budget. COMPLETE WORKFLOW: 1) list_projects → 2) list_project_deals → 3) list_deal_services → 4) get_project_tasks (recommended) → 5) create_time_entry. After this, optionally use get_project_tasks to find specific tasks to link your time entry to.',
   inputSchema: {
     type: 'object',
     properties: {
