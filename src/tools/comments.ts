@@ -275,7 +275,7 @@ export async function getCommentTool(
 
 export const getCommentDefinition = {
   name: 'get_comment',
-  description: 'Get a single comment by ID from Productive.io with all attributes.',
+  description: 'Get a single comment by ID. Use this only for one specific comment you already know the ID of, typically one that fell outside get_task_overview\'s comment_limit. To read a task\'s thread, call get_task_overview, which returns full comment bodies in one call.',
   inputSchema: {
     type: 'object',
     properties: {

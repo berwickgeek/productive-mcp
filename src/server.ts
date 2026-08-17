@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { getConfig } from './config/index.js';
+import { SERVER_INFO, buildServerOptions } from './server-instructions.js';
 import { ProductiveAPIClient } from './api/client.js';
 import { listProjectsTool, listProjectsDefinition } from './tools/projects.js';
 import { listTasksTool, getProjectTasksTool, getTaskTool, createTaskTool, updateTaskAssignmentTool, updateTaskDetailsTool, deleteTaskTool, listTasksDefinition, getProjectTasksDefinition, getTaskDefinition, createTaskDefinition, updateTaskAssignmentDefinition, updateTaskDetailsDefinition, deleteTaskDefinition } from './tools/tasks.js';
@@ -122,21 +123,9 @@ export const toolDefinitions = [
 export async function createServer() {
   // Initialize API client and config early to check user context
   const config = getConfig();
-  const hasConfiguredUser = !!config.PRODUCTIVE_USER_ID;
-  
-  const server = new Server(
-    {
-      name: 'productive-mcp',
-      version: '1.0.0',
-      description: `MCP server for Productive.io API integration. Productive has a hierarchical structure: Customers → Projects → Boards → Task Lists → Tasks.${hasConfiguredUser ? ` IMPORTANT: When users say "me" or "assign to me", use "me" as the assignee_id value - it automatically resolves to the configured user ID ${config.PRODUCTIVE_USER_ID}.` : ' No user configured - set PRODUCTIVE_USER_ID to enable "me" context.'} Use the 'whoami' tool to check current user context.`,
-    },
-    {
-      capabilities: {
-        tools: {},
-        prompts: {},
-      },
-    }
-  );
+
+  // instructions must ride on the second argument. See server-instructions.ts.
+  const server = new Server(SERVER_INFO, buildServerOptions(config.PRODUCTIVE_USER_ID));
   const apiClient = new ProductiveAPIClient(config);
   
   // Register handlers
