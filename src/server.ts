@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { getConfig } from './config/index.js';
-import { buildInstructions } from './server-instructions.js';
+import { SERVER_INFO, buildServerOptions } from './server-instructions.js';
 import { ProductiveAPIClient } from './api/client.js';
 import { listProjectsTool, listProjectsDefinition } from './tools/projects.js';
 import { listTasksTool, getProjectTasksTool, getTaskTool, createTaskTool, updateTaskAssignmentTool, updateTaskDetailsTool, deleteTaskTool, listTasksDefinition, getProjectTasksDefinition, getTaskDefinition, createTaskDefinition, updateTaskAssignmentDefinition, updateTaskDetailsDefinition, deleteTaskDefinition } from './tools/tasks.js';
@@ -124,19 +124,8 @@ export async function createServer() {
   // Initialize API client and config early to check user context
   const config = getConfig();
 
-  const server = new Server(
-    {
-      name: 'productive-mcp',
-      version: '1.0.0',
-    },
-    {
-      capabilities: {
-        tools: {},
-        prompts: {},
-      },
-      instructions: buildInstructions(config.PRODUCTIVE_USER_ID),
-    }
-  );
+  // instructions must ride on the second argument. See server-instructions.ts.
+  const server = new Server(SERVER_INFO, buildServerOptions(config.PRODUCTIVE_USER_ID));
   const apiClient = new ProductiveAPIClient(config);
   
   // Register handlers
