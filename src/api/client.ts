@@ -215,7 +215,10 @@ export class ProductiveAPIClient {
     project_id?: string;
     assignee_id?: string;
     parent_task_id?: string;
+    task_list_id?: string;
     status?: 'open' | 'closed';
+    /** JSON:API sort, e.g. `placement` or `-placement` for descending. */
+    sort?: string;
     limit?: number;
     page?: number;
   }): Promise<ProductiveResponse<ProductiveTask>> {
@@ -226,6 +229,14 @@ export class ProductiveAPIClient {
 
     if (params?.project_id) {
       queryParams.append('filter[project_id]', params.project_id);
+    }
+
+    if (params?.task_list_id) {
+      queryParams.append('filter[task_list_id]', params.task_list_id);
+    }
+
+    if (params?.sort) {
+      queryParams.append('sort', params.sort);
     }
 
     if (params?.parent_task_id) {
