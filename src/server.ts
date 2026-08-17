@@ -30,6 +30,93 @@ import { listPeopleTool, listPeopleDefinition, getPersonTool, getPersonDefinitio
 import { listTaskDependenciesTool, listTaskDependenciesDefinition, getTaskDependencyTool, getTaskDependencyDefinition, createTaskDependencyTool, createTaskDependencyDefinition, deleteTaskDependencyTool, deleteTaskDependencyDefinition } from './tools/task-dependencies.js';
 import { getAttachmentTool, getAttachmentDefinition } from './tools/attachments.js';
 
+/**
+ * Every tool this server advertises, in the order clients see them.
+ *
+ * Exported so tests can assert on the surface without standing up a transport.
+ */
+export const toolDefinitions = [
+  whoAmITool,
+  listCompaniesDefinition,
+  listProjectsDefinition,
+  listBoardsTool,
+  createBoardTool,
+  listTaskListsTool,
+  createTaskListTool,
+  getTaskListDefinition,
+  updateTaskListDefinition,
+  archiveTaskListDefinition,
+  restoreTaskListDefinition,
+  copyTaskListDefinition,
+  moveTaskListDefinition,
+  repositionTaskListDefinition,
+  listTasksDefinition,
+  getProjectTasksDefinition,
+  getTaskDefinition,
+  createTaskDefinition,
+  updateTaskAssignmentDefinition,
+  updateTaskDetailsDefinition,
+  addTaskCommentDefinition,
+  updateTaskStatusDefinition,
+  listWorkflowStatusesDefinition,
+  myTasksDefinition,
+  listActivitiesTool,
+  getRecentUpdatesTool,
+  listTimeEntriesDefinition,
+  createTimeEntryDefinition,
+  listProjectDealsDefinition,
+  listDealServicesDefinition,
+  listServicesDefinition,
+  getProjectServicesDefinition,
+  updateTaskSprintTool,
+  moveTaskToListTool,
+  addToBacklogTool,
+  taskRepositionDefinition,
+  deleteTaskDefinition,
+  // Folders
+  listFoldersTool,
+  getFolderTool,
+  createFolderTool,
+  updateFolderTool,
+  archiveFolderTool,
+  restoreFolderTool,
+  // Subtasks
+  listSubtasksDefinition,
+  createSubtaskDefinition,
+  // Comments (expanded)
+  listCommentsDefinition,
+  getCommentDefinition,
+  updateCommentDefinition,
+  deleteCommentDefinition,
+  pinCommentDefinition,
+  unpinCommentDefinition,
+  addCommentReactionDefinition,
+  // Todos
+  listTodosDefinition,
+  getTodoDefinition,
+  createTodoDefinition,
+  updateTodoDefinition,
+  deleteTodoDefinition,
+  // Pages
+  listPagesDefinition,
+  getPageDefinition,
+  createPageDefinition,
+  updatePageDefinition,
+  deletePageDefinition,
+  movePageDefinition,
+  copyPageDefinition,
+  // People
+  listPeopleDefinition,
+  getPersonDefinition,
+  // Task Dependencies
+  listTaskDependenciesDefinition,
+  getTaskDependencyDefinition,
+  createTaskDependencyDefinition,
+  deleteTaskDependencyDefinition,
+  // Attachments
+  getAttachmentDefinition,
+];
+
 export async function createServer() {
   // Initialize API client and config early to check user context
   const config = getConfig();
@@ -52,87 +139,7 @@ export async function createServer() {
   
   // Register handlers
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
-      whoAmITool,
-      listCompaniesDefinition,
-      listProjectsDefinition,
-      listBoardsTool,
-      createBoardTool,
-      listTaskListsTool,
-      createTaskListTool,
-      getTaskListDefinition,
-      updateTaskListDefinition,
-      archiveTaskListDefinition,
-      restoreTaskListDefinition,
-      copyTaskListDefinition,
-      moveTaskListDefinition,
-      repositionTaskListDefinition,
-      listTasksDefinition,
-      getProjectTasksDefinition,
-      getTaskDefinition,
-      createTaskDefinition,
-      updateTaskAssignmentDefinition,
-      updateTaskDetailsDefinition,
-      addTaskCommentDefinition,
-      updateTaskStatusDefinition,
-      listWorkflowStatusesDefinition,
-      myTasksDefinition,
-      listActivitiesTool,
-      getRecentUpdatesTool,
-      listTimeEntriesDefinition,
-      createTimeEntryDefinition,
-      listProjectDealsDefinition,
-      listDealServicesDefinition,
-      listServicesDefinition,
-      getProjectServicesDefinition,
-      updateTaskSprintTool,
-      moveTaskToListTool,
-      addToBacklogTool,
-      taskRepositionDefinition,
-      deleteTaskDefinition,
-      // Folders
-      listFoldersTool,
-      getFolderTool,
-      createFolderTool,
-      updateFolderTool,
-      archiveFolderTool,
-      restoreFolderTool,
-      // Subtasks
-      listSubtasksDefinition,
-      createSubtaskDefinition,
-      // Comments (expanded)
-      listCommentsDefinition,
-      getCommentDefinition,
-      updateCommentDefinition,
-      deleteCommentDefinition,
-      pinCommentDefinition,
-      unpinCommentDefinition,
-      addCommentReactionDefinition,
-      // Todos
-      listTodosDefinition,
-      getTodoDefinition,
-      createTodoDefinition,
-      updateTodoDefinition,
-      deleteTodoDefinition,
-      // Pages
-      listPagesDefinition,
-      getPageDefinition,
-      createPageDefinition,
-      updatePageDefinition,
-      deletePageDefinition,
-      movePageDefinition,
-      copyPageDefinition,
-      // People
-      listPeopleDefinition,
-      getPersonDefinition,
-      // Task Dependencies
-      listTaskDependenciesDefinition,
-      getTaskDependencyDefinition,
-      createTaskDependencyDefinition,
-      deleteTaskDependencyDefinition,
-      // Attachments
-      getAttachmentDefinition,
-    ],
+    tools: toolDefinitions,
   }));
   
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
