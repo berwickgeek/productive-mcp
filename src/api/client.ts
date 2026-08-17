@@ -367,8 +367,16 @@ export class ProductiveAPIClient {
     return this.makeRequest<ProductiveSingleResponse<ProductivePerson>>(`people/${personId}`);
   }
 
-  async getTask(taskId: string): Promise<ProductiveSingleResponse<ProductiveTask>> {
-    return this.makeRequest<ProductiveSingleResponse<ProductiveTask>>(`tasks/${taskId}`);
+  /**
+   * Fetch a single task.
+   *
+   * @param taskId - The task ID
+   * @param include - Optional JSON:API `include` list, e.g. `assignee,workflow_status,attachments`.
+   *                  Included resources arrive in the response's `included` array.
+   */
+  async getTask(taskId: string, include?: string): Promise<ProductiveSingleResponse<ProductiveTask>> {
+    const qs = include ? `?include=${encodeURIComponent(include)}` : '';
+    return this.makeRequest<ProductiveSingleResponse<ProductiveTask>>(`tasks/${encodeURIComponent(taskId)}${qs}`);
   }
 
   async updateTask(taskId: string, taskData: ProductiveTaskUpdate): Promise<ProductiveSingleResponse<ProductiveTask>> {
@@ -992,6 +1000,8 @@ export class ProductiveAPIClient {
     project_id?: string;
     discussion_id?: string;
     page_id?: string;
+    /** JSON:API sort expression, e.g. `-created_at` for newest first. */
+    sort?: string;
     limit?: number;
     page?: number;
   }): Promise<ProductiveResponse<ProductiveComment>> {
@@ -1001,6 +1011,7 @@ export class ProductiveAPIClient {
     if (params?.project_id) q.append('filter[project_id]', params.project_id);
     if (params?.discussion_id) q.append('filter[discussion_id]', params.discussion_id);
     if (params?.page_id) q.append('filter[page_id]', params.page_id);
+    if (params?.sort) q.append('sort', params.sort);
     if (params?.limit) q.append('page[size]', params.limit.toString());
     if (params?.page) q.append('page[number]', params.page.toString());
     const qs = q.toString();

@@ -29,6 +29,7 @@ import { listPagesTool, listPagesDefinition, getPageTool, getPageDefinition, cre
 import { listPeopleTool, listPeopleDefinition, getPersonTool, getPersonDefinition } from './tools/people.js';
 import { listTaskDependenciesTool, listTaskDependenciesDefinition, getTaskDependencyTool, getTaskDependencyDefinition, createTaskDependencyTool, createTaskDependencyDefinition, deleteTaskDependencyTool, deleteTaskDependencyDefinition } from './tools/task-dependencies.js';
 import { getAttachmentTool, getAttachmentDefinition } from './tools/attachments.js';
+import { getTaskOverviewTool, getTaskOverviewDefinition } from './tools/task-overview.js';
 
 /**
  * Every tool this server advertises, in the order clients see them.
@@ -52,6 +53,7 @@ export const toolDefinitions = [
   repositionTaskListDefinition,
   listTasksDefinition,
   getProjectTasksDefinition,
+  getTaskOverviewDefinition,
   getTaskDefinition,
   createTaskDefinition,
   updateTaskAssignmentDefinition,
@@ -163,6 +165,9 @@ export async function createServer() {
         
       case 'get_task':
         return await getTaskTool(apiClient, args);
+
+      case 'get_task_overview':
+        return await getTaskOverviewTool(apiClient, args);
         
       case 'my_tasks':
         return await myTasksTool(apiClient, config, args);

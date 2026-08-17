@@ -199,7 +199,7 @@ export async function listCommentsTool(
 
 export const listCommentsDefinition = {
   name: 'list_comments',
-  description: 'List comments in Productive.io, optionally filtered by task or project.',
+  description: 'List comments in Productive.io, optionally filtered by task or project. Bodies are truncated to 200 characters here, so reading a task this way costs a follow-up get_comment per comment. To read a task\'s thread, use get_task_overview instead, which returns full comment bodies in one call.',
   inputSchema: {
     type: 'object',
     properties: {
