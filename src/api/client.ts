@@ -214,6 +214,7 @@ export class ProductiveAPIClient {
   async listTasks(params?: {
     project_id?: string;
     assignee_id?: string;
+    parent_task_id?: string;
     status?: 'open' | 'closed';
     limit?: number;
     page?: number;
@@ -225,6 +226,10 @@ export class ProductiveAPIClient {
 
     if (params?.project_id) {
       queryParams.append('filter[project_id]', params.project_id);
+    }
+
+    if (params?.parent_task_id) {
+      queryParams.append('filter[parent_task_id]', params.parent_task_id);
     }
 
     if (params?.assignee_id) {
@@ -365,6 +370,18 @@ export class ProductiveAPIClient {
 
   async getPerson(personId: string): Promise<ProductiveSingleResponse<ProductivePerson>> {
     return this.makeRequest<ProductiveSingleResponse<ProductivePerson>>(`people/${personId}`);
+  }
+
+  /**
+   * Fetch a single project.
+   *
+   * @param projectId - The project ID
+   * @param include - Optional JSON:API `include` list, e.g. `workflow`.
+   *                  Included resources arrive in the response's `included` array.
+   */
+  async getProject(projectId: string, include?: string): Promise<ProductiveSingleResponse<ProductiveProject>> {
+    const qs = include ? `?include=${encodeURIComponent(include)}` : '';
+    return this.makeRequest<ProductiveSingleResponse<ProductiveProject>>(`projects/${encodeURIComponent(projectId)}${qs}`);
   }
 
   /**

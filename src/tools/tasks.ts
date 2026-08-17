@@ -167,28 +167,8 @@ export async function getTaskTool(
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
     const params = getTaskSchema.parse(args);
-    
-    // Import and use config directly
-    const config = await import('../config/index.js').then(m => m.getConfig());
-    
-    // Create URL with task_list included
-    const url = `${config.PRODUCTIVE_API_BASE_URL}tasks/${params.task_id}?include=task_list,assignee,workflow_status,attachments`;
-    
-    // Create request with proper headers from config
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'X-Auth-Token': config.PRODUCTIVE_API_TOKEN,
-        'X-Organization-Id': config.PRODUCTIVE_ORG_ID,
-        'Content-Type': 'application/vnd.api+json',
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to get task: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
+
+    const data = await client.getTask(params.task_id, 'task_list,assignee,workflow_status,attachments');
     const task = data.data;
     const projectId = task.relationships?.project?.data?.id;
     const assigneeId = task.relationships?.assignee?.data?.id;
