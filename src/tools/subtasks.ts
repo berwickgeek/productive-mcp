@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { getConfig } from '../config/index.js';
+import { toMcpError } from '../utils/errors.js';
 import { ProductiveIncludedResource } from '../api/types.js';
 
 function resolvePersonName(personId: string | undefined, included?: ProductiveIncludedResource[]): string | undefined {
@@ -27,31 +27,17 @@ const listSubtasksSchema = z.object({
 });
 
 export async function listSubtasksTool(
-  _client: ProductiveAPIClient,
+  client: ProductiveAPIClient,
   args: unknown
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
     const params = listSubtasksSchema.parse(args || {});
-    const config = getConfig();
 
-    const limit = params.limit ?? 30;
-    const page = params.page ?? 1;
-    const url = `${config.PRODUCTIVE_API_BASE_URL}tasks?filter[parent_task_id]=${params.parent_task_id}&include=assignee,workflow_status&page[size]=${limit}&page[number]=${page}`;
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'X-Auth-Token': config.PRODUCTIVE_API_TOKEN,
-        'X-Organization-Id': config.PRODUCTIVE_ORG_ID,
-        'Content-Type': 'application/vnd.api+json',
-      },
+    const data = await client.listTasks({
+      parent_task_id: params.parent_task_id,
+      limit: params.limit ?? 30,
+      page: params.page ?? 1,
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to list subtasks: ${response.statusText}`);
-    }
-
-    const data = await response.json();
 
     if (!data || !data.data || data.data.length === 0) {
       return {
@@ -90,17 +76,7 @@ export async function listSubtasksTool(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-
-    throw new McpError(
-      ErrorCode.InternalError,
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    );
+    throw toMcpError(error);
   }
 }
 

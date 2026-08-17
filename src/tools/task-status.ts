@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
 import { ProductiveTaskUpdate, ProductiveIncludedResource } from '../api/types.js';
-import { getConfig } from '../config/index.js';
 
 const updateTaskStatusSchema = z.object({
   task_id: z.string().min(1, 'Task ID is required'),
@@ -16,52 +16,25 @@ const updateTaskStatusSchema = z.object({
  * Path: task → project (include=workflow) → workflow_id → list statuses
  */
 async function resolveWorkflowStatuses(
+  client: ProductiveAPIClient,
   taskId: string
 ): Promise<{ workflowId: string; statuses: Array<{ id: string; name: string; categoryId: number }> }> {
-  const cfg = getConfig();
-  const headers = {
-    'X-Auth-Token': cfg.PRODUCTIVE_API_TOKEN,
-    'X-Organization-Id': cfg.PRODUCTIVE_ORG_ID,
-    'Content-Type': 'application/vnd.api+json',
-  };
-
   // Step 1: Get the task with project included to find its project ID
-  const taskRes = await fetch(
-    `${cfg.PRODUCTIVE_API_BASE_URL}tasks/${taskId}?include=project`,
-    { headers }
-  );
-  if (!taskRes.ok) {
-    throw new Error(`Failed to fetch task ${taskId}: ${taskRes.status}`);
-  }
-  const taskData = await taskRes.json();
+  const taskData = await client.getTask(taskId, 'project');
   const projectId = taskData.data?.relationships?.project?.data?.id;
   if (!projectId) {
     throw new Error('Task has no project assigned');
   }
 
   // Step 2: Get the project with workflow included to find workflow_id
-  const projRes = await fetch(
-    `${cfg.PRODUCTIVE_API_BASE_URL}projects/${projectId}?include=workflow`,
-    { headers }
-  );
-  if (!projRes.ok) {
-    throw new Error(`Failed to fetch project ${projectId}: ${projRes.status}`);
-  }
-  const projData = await projRes.json();
+  const projData = await client.getProject(projectId, 'workflow');
   const workflowId = projData.data?.relationships?.workflow?.data?.id;
   if (!workflowId) {
     throw new Error('Project has no workflow configured');
   }
 
   // Step 3: List all statuses in this workflow
-  const statusRes = await fetch(
-    `${cfg.PRODUCTIVE_API_BASE_URL}workflow_statuses?filter[workflow_id]=${workflowId}&page[size]=200`,
-    { headers }
-  );
-  if (!statusRes.ok) {
-    throw new Error(`Failed to fetch workflow statuses: ${statusRes.status}`);
-  }
-  const statusData = await statusRes.json();
+  const statusData = await client.listWorkflowStatuses({ workflow_id: workflowId, limit: 200 });
 
   const statuses = statusData.data.map((s: ProductiveIncludedResource) => ({
     id: s.id,
@@ -104,7 +77,7 @@ export async function updateTaskStatusTool(
 
     // If status_name provided, resolve it to an ID
     if (params.status_name && !resolvedStatusId) {
-      const { statuses } = await resolveWorkflowStatuses(params.task_id);
+      const { statuses } = await resolveWorkflowStatuses(client, params.task_id);
       const needle = params.status_name.toLowerCase().trim();
 
       // 1. Exact match (case-insensitive)
@@ -189,19 +162,7 @@ export async function updateTaskStatusTool(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-
-    if (error instanceof McpError) throw error;
-
-    throw new McpError(
-      ErrorCode.InternalError,
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    );
+    throw toMcpError(error);
   }
 }
 
