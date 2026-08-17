@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to a PR makes the first run irrelevant, so stop it rather than pay for it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Type-check, unit tests, build, and a real handshake against the compiled artifact.
+  # Split by Node version because vitest requires ^20 || ^22 || >=24, so the toolchain cannot
+  # run on the minimum version this package supports. That is covered by `runtime` below.
+  check:
+    name: check (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Report every failing version, not just the first to fall over.
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type-check
+        run: npm run type-check
+
+      # No credentials are set on purpose. The suite must not need a live Productive token,
+      # and running it bare is what keeps that true.
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Type-checking and unit tests both run against source. This is the only step that
+      # proves the compiled artifact starts, completes an MCP handshake, and advertises the
+      # tool surface. It makes no API calls, so the placeholder token is never used.
+      - name: Smoke-test the built server
+        env:
+          PRODUCTIVE_API_TOKEN: ci-placeholder-not-a-real-token
+          PRODUCTIVE_ORG_ID: '0'
+        run: node scripts/smoke-test.mjs
+
+  # package.json declares engines >= 18. The published server has to actually start there,
+  # even though the dev toolchain cannot. Without this, "we support 18" is an untested claim.
+  runtime:
+    name: runtime (node 18, minimum supported)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build on a version the toolchain supports, then run the output on the oldest one.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Start the built server on Node 18
+        env:
+          PRODUCTIVE_API_TOKEN: ci-placeholder-not-a-real-token
+          PRODUCTIVE_ORG_ID: '0'
+        run: |
+          node --version
+          node scripts/smoke-test.mjs
