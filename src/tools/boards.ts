@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
 
 const ListBoardsSchema = z.object({
   project_id: z.string().optional().describe('Filter boards by project ID'),
@@ -51,24 +51,7 @@ export async function listBoards(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
-      );
-    }
-    
-    if (error instanceof Error) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        `API error: ${error.message}`
-      );
-    }
-    
-    throw new McpError(
-      ErrorCode.InternalError,
-      'Unknown error occurred while fetching boards'
-    );
+    throw toMcpError(error);
   }
 }
 
@@ -141,24 +124,7 @@ export async function createBoard(
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
-      );
-    }
-    
-    if (error instanceof Error) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        `API error: ${error.message}`
-      );
-    }
-    
-    throw new McpError(
-      ErrorCode.InternalError,
-      'Unknown error occurred while creating board'
-    );
+    throw toMcpError(error);
   }
 }
 

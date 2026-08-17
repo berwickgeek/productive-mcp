@@ -211,22 +211,16 @@ export async function createTimeEntryTool(
     try {
       parsedDate = parseDate(params.date);
     } catch (error) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        error instanceof Error ? error.message : 'Invalid date format'
-      );
-    }
+    throw toMcpError(error);
+  }
     
     // Parse and validate time
     let timeInMinutes: number;
     try {
       timeInMinutes = parseTimeToMinutes(params.time);
     } catch (error) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        error instanceof Error ? error.message : 'Invalid time format'
-      );
-    }
+    throw toMcpError(error);
+  }
     
     // Parse billable time if provided
     let billableTimeInMinutes: number | undefined;
@@ -234,11 +228,8 @@ export async function createTimeEntryTool(
       try {
         billableTimeInMinutes = parseTimeToMinutes(params.billable_time);
       } catch (error) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `Invalid billable time format: ${error instanceof Error ? error.message : 'Invalid time format'}`
-        );
-      }
+    throw toMcpError(error);
+  }
     }
     
     // If not confirmed, show confirmation details

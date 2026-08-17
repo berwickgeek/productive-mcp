@@ -44,10 +44,12 @@ export function toMcpError(error: unknown): McpError {
   }
 
   if (error instanceof z.ZodError) {
-    return new McpError(
-      ErrorCode.InvalidParams,
-      `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
+    // Keep the field path when Zod gives one ("limit: Number must be <= 200"), because
+    // otherwise a caller with several arguments cannot tell which one was rejected.
+    const details = error.errors.map(e =>
+      e.path.length > 0 ? `${e.path.join('.')}: ${e.message}` : e.message
     );
+    return new McpError(ErrorCode.InvalidParams, `Invalid parameters: ${details.join(', ')}`);
   }
 
   if (error instanceof ProductiveApiError && CALLER_FAULT_STATUSES.has(error.httpStatus)) {

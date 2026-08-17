@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { toMcpError } from '../utils/errors.js';
 
 const WhoAmIArgsSchema = z.object({});
 
@@ -42,8 +42,8 @@ When you use "me" in any command, it refers to this user.`,
         };
       }
     } catch (error) {
-      // If we can't fetch user details, just show the ID
-    }
+    throw toMcpError(error);
+  }
     
     return {
       content: [{
@@ -54,17 +54,7 @@ When you use "me" in any command, it refers to this user ID.`,
       }],
     };
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters: ${error.errors.map(e => e.message).join(', ')}`
-      );
-    }
-    
-    throw new McpError(
-      ErrorCode.InternalError,
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    );
+    throw toMcpError(error);
   }
 }
 
