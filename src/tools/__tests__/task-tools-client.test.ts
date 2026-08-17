@@ -9,6 +9,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getTaskTool } from '../tasks.js';
 import { listSubtasksTool } from '../subtasks.js';
 import { updateTaskStatusTool } from '../task-status.js';
@@ -168,7 +169,8 @@ describe('updateTaskStatusTool', () => {
 
 describe('tool layer', () => {
   it('never calls fetch directly, so every request carries client error handling', () => {
-    const toolsDir = join(import.meta.dirname, '..');
+    // Not import.meta.dirname: that needs Node >= 20.11 and package.json allows >= 18.
+    const toolsDir = fileURLToPath(new URL('..', import.meta.url));
     const offenders = readdirSync(toolsDir)
       .filter(f => f.endsWith('.ts'))
       .filter(f => /(?<!\w)fetch\s*\(/.test(readFileSync(join(toolsDir, f), 'utf8')));
