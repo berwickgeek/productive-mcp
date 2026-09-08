@@ -119,6 +119,53 @@ describe('listWorkflowStatuses request', () => {
   });
 });
 
+describe('updateTimeEntry request', () => {
+  it('PATCHes the single entry with the payload it was given', async () => {
+    const spy = stubFetch();
+    const payload = {
+      data: {
+        type: 'time_entries' as const,
+        id: '161683643',
+        attributes: { time: 90, billable_time: 90, note: 'Consolidated support work' },
+      },
+    };
+
+    await new ProductiveAPIClient(config).updateTimeEntry('161683643', payload);
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/time_entries/161683643');
+    const init = spy.mock.calls[0][1];
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual(payload);
+  });
+});
+
+describe('deleteTimeEntry request', () => {
+  it('DELETEs the single entry', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).deleteTimeEntry('161832749');
+
+    expect(urlOf(spy).pathname).toBe('/time_entries/161832749');
+    expect(spy.mock.calls[0][1].method).toBe('DELETE');
+  });
+
+  // The endpoint answers 204 with an empty body. Routed through makeRequest instead, the
+  // JSON parse throws and a successful delete is reported as a failure.
+  it('does not parse the empty 204 body', async () => {
+    const spy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    });
+    vi.stubGlobal('fetch', spy);
+
+    await expect(new ProductiveAPIClient(config).deleteTimeEntry('161832749')).resolves.toBeUndefined();
+  });
+});
+
 describe('request headers', () => {
   it('sends auth and org headers on every request', async () => {
     const spy = stubFetch();
