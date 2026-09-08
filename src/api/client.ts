@@ -25,6 +25,7 @@ import {
   ProductiveCommentCreate,
   ProductiveCommentUpdate,
   ProductiveTimeEntryCreate,
+  ProductiveTimeEntryUpdate,
   ProductiveFolderCreate,
   ProductiveFolderUpdate,
   ProductiveTodoCreate,
@@ -748,6 +749,45 @@ export class ProductiveAPIClient {
    */
   async getTimeEntry(timeEntryId: string): Promise<ProductiveSingleResponse<ProductiveTimeEntry>> {
     return this.makeRequest<ProductiveSingleResponse<ProductiveTimeEntry>>(`time_entries/${timeEntryId}`);
+  }
+
+  /**
+   * Update an existing time entry
+   *
+   * @param timeEntryId - The ID of the time entry to update
+   * @param data - Patch payload. Only the supplied fields are changed.
+   * @returns Promise resolving to the updated time entry
+   *
+   * @example
+   * const timeEntry = await client.updateTimeEntry('123', {
+   *   data: {
+   *     type: 'time_entries',
+   *     id: '123',
+   *     attributes: { time: 90, billable_time: 90, note: 'Investigated and fixed the renewal form.' }
+   *   }
+   * });
+   */
+  async updateTimeEntry(timeEntryId: string, data: ProductiveTimeEntryUpdate): Promise<ProductiveSingleResponse<ProductiveTimeEntry>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveTimeEntry>>(`time_entries/${timeEntryId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Permanently delete a time entry
+   *
+   * The endpoint answers 204 No Content, so this goes through makeVoidRequest. makeRequest
+   * would throw parsing an empty body.
+   *
+   * @param timeEntryId - The ID of the time entry to delete
+   * @returns Promise resolving once the entry is gone
+   *
+   * @example
+   * await client.deleteTimeEntry('123');
+   */
+  async deleteTimeEntry(timeEntryId: string): Promise<void> {
+    return this.makeVoidRequest(`time_entries/${timeEntryId}`, { method: 'DELETE' });
   }
 
   /**
