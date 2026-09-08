@@ -13,10 +13,10 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-const EXPECTED_TOOL_COUNT = 72;
+const EXPECTED_TOOL_COUNT = 74;
 
 /** Tools whose annotations a client relies on to gate a destructive call. */
-const MUST_BE_DESTRUCTIVE = ['delete_task', 'delete_comment', 'delete_page', 'delete_todo'];
+const MUST_BE_DESTRUCTIVE = ['delete_task', 'delete_comment', 'delete_page', 'delete_todo', 'delete_time_entry'];
 
 const failures = [];
 

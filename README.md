@@ -343,6 +343,8 @@ still works, but costs one round trip per comment and truncates bodies to 200 ch
 |------|-------------|
 | `list_time_entries` | List time entries. Filter by `date`, `after`, `before`, `person_id`, `project_id`, `task_id`, `service_id` |
 | `create_time_entry` | Create a time entry. Requires `date`, `time` (minutes), `person_id`, `service_id`. Optional `task_id`, `note` |
+| `update_time_entry` | Amend a time entry by `time_entry_id`. Optional `time`, `note`, `date`, `service_id`, `billable_time`. Only the fields supplied are changed |
+| `delete_time_entry` | Permanently delete a time entry by `time_entry_id`. Requires `confirm: true` on a second call |
 | `list_services` | List services. Filter by `company_id`, `limit` |
 | `get_project_services` | Get services for a project |
 | `list_project_deals` | List deals/budgets for a project |

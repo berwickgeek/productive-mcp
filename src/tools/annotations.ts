@@ -141,6 +141,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   delete_page: destroy('Delete page'),
   delete_task: destroy('Delete task'),
   delete_task_dependency: destroy('Delete task dependency'),
+  delete_time_entry: destroy('Delete time entry'),
   delete_todo: destroy('Delete todo'),
   update_comment: destroy('Edit comment'),
   update_folder: destroy('Update folder'),
@@ -150,6 +151,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   update_task_list: destroy('Update task list'),
   update_task_sprint: destroy('Set task sprint'),
   update_task_status: destroy('Set task status'),
+  update_time_entry: destroy('Amend time entry'),
   update_todo: destroy('Update todo'),
 };
 

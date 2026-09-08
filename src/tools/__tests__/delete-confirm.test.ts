@@ -16,6 +16,7 @@ import { deleteCommentTool, deleteCommentDefinition } from '../comments.js';
 import { deletePageTool, deletePageDefinition } from '../pages.js';
 import { deleteTodoTool, deleteTodoDefinition } from '../todos.js';
 import { deleteTaskDependencyTool, deleteTaskDependencyDefinition } from '../task-dependencies.js';
+import { deleteTimeEntryTool, deleteTimeEntryDefinition } from '../time-entries.js';
 
 function mockClient(overrides: Record<string, unknown>): ProductiveAPIClient {
   return overrides as unknown as ProductiveAPIClient;
@@ -93,6 +94,22 @@ const CASES = [
       },
     },
     expectInPreview: 'Dependent task ID: 2',
+  },
+  {
+    name: 'delete_time_entry',
+    tool: deleteTimeEntryTool,
+    definition: deleteTimeEntryDefinition,
+    args: { time_entry_id: '161832749' },
+    getter: 'getTimeEntry',
+    deleter: 'deleteTimeEntry',
+    record: {
+      data: {
+        id: '161832749',
+        attributes: { date: '2026-09-07', time: 90, billable_time: 90, note: 'Consolidated support work on the renewals form' },
+        relationships: { person: { data: { id: '698785' } }, task: { data: { id: '19957563' } } },
+      },
+    },
+    expectInPreview: 'Consolidated support work on the renewals form',
   },
 ] as const;
 
