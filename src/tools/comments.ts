@@ -167,11 +167,13 @@ export async function listCommentsTool(
       const pinned = comment.attributes.pinned_at ? ' [PINNED]' : '';
       const body = truncateBody(comment.attributes.body);
       const attachments = formatAttachments(comment.relationships, response.included, '  ');
-      // Visibility, draft state and edit time let a poller classify a thread from this one call.
-      // Editing keeps a comment's id, so edited_at is the only sign an old comment changed.
+      // Visibility, draft state and change times let a poller classify a thread from this one call.
+      // Editing keeps a comment's id, so a changed timestamp is the only sign an old comment changed.
+      // Updated is printed on every comment because the API does not reliably set edited_at when
+      // a comment's text is edited; updated_at does move, though also on saves that change nothing.
       const edited = comment.attributes.edited_at ? `\n  Edited: ${comment.attributes.edited_at}` : '';
 
-      return `- Comment ID: ${comment.id}${pinned}\n  By: ${creatorName}\n  Date: ${comment.attributes.created_at}\n  Hidden: ${comment.attributes.hidden ?? false}\n  Draft: ${comment.attributes.draft ?? false}${edited}\n  Body: ${body}${attachments}`;
+      return `- Comment ID: ${comment.id}${pinned}\n  By: ${creatorName}\n  Date: ${comment.attributes.created_at}\n  Hidden: ${comment.attributes.hidden ?? false}\n  Draft: ${comment.attributes.draft ?? false}\n  Updated: ${comment.attributes.updated_at}${edited}\n  Body: ${body}${attachments}`;
     }).join('\n\n');
 
     return {
