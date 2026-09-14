@@ -167,8 +167,11 @@ export async function listCommentsTool(
       const pinned = comment.attributes.pinned_at ? ' [PINNED]' : '';
       const body = truncateBody(comment.attributes.body);
       const attachments = formatAttachments(comment.relationships, response.included, '  ');
+      // Visibility, draft state and edit time let a poller classify a thread from this one call.
+      // Editing keeps a comment's id, so edited_at is the only sign an old comment changed.
+      const edited = comment.attributes.edited_at ? `\n  Edited: ${comment.attributes.edited_at}` : '';
 
-      return `- Comment ID: ${comment.id}${pinned}\n  By: ${creatorName}\n  Date: ${comment.attributes.created_at}\n  Body: ${body}${attachments}`;
+      return `- Comment ID: ${comment.id}${pinned}\n  By: ${creatorName}\n  Date: ${comment.attributes.created_at}\n  Hidden: ${comment.attributes.hidden ?? false}\n  Draft: ${comment.attributes.draft ?? false}${edited}\n  Body: ${body}${attachments}`;
     }).join('\n\n');
 
     return {

@@ -185,3 +185,44 @@ describe('listCommentsTool - attachments', () => {
     expect(text).not.toContain('token');
   });
 });
+
+describe('listCommentsTool - visibility, draft and edit flags', () => {
+  it('prints Hidden, Draft and Edited for a hidden draft that has been edited', async () => {
+    const comment: ProductiveComment = {
+      id: '2001',
+      type: 'comments',
+      attributes: {
+        body: 'Internal instruction',
+        commentable_type: 'task',
+        created_at: '2026-01-01T09:00:00Z',
+        updated_at: '2026-01-02T09:00:00Z',
+        edited_at: '2026-01-02T09:00:00Z',
+        hidden: true,
+        draft: true,
+      },
+    };
+    const listComments = vi.fn().mockResolvedValue({ data: [comment] });
+    const client = { listComments } as unknown as ProductiveAPIClient;
+
+    const result = await listCommentsTool(client, { task_id: '1001' });
+
+    const text = result.content[0].text;
+    expect(text).toContain('Hidden: true');
+    expect(text).toContain('Draft: true');
+    expect(text).toContain('Edited: 2026-01-02T09:00:00Z');
+  });
+
+  it('defaults Hidden and Draft to false and omits Edited when the comment was never edited', async () => {
+    const listComments = vi.fn().mockResolvedValue({
+      data: [makeListedComment('7', 'Visible note')],
+    });
+    const client = { listComments } as unknown as ProductiveAPIClient;
+
+    const result = await listCommentsTool(client, { task_id: '1001' });
+
+    const text = result.content[0].text;
+    expect(text).toContain('Hidden: false');
+    expect(text).toContain('Draft: false');
+    expect(text).not.toContain('Edited:');
+  });
+});
