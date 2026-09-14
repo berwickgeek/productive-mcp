@@ -49,16 +49,16 @@ describe('getAttachmentTool', () => {
       data: Buffer.from('%PDF-1.4 fake'),
     });
 
-    const result = await getAttachmentTool(client, { attachment_id: '8779248' });
+    const result = await getAttachmentTool(client, { attachment_id: '5000003' });
 
-    expect(downloadAttachment).toHaveBeenCalledWith('8779248');
+    expect(downloadAttachment).toHaveBeenCalledWith('5000003');
     expect(mkdir).toHaveBeenCalledWith('/cache', { recursive: true });
     expect(writeFile).toHaveBeenCalledTimes(1);
     const text = result.content[0] as { type: string; text: string };
     expect(text.text).toContain('report.pdf');
     expect(text.text).toContain('application/pdf');
     expect(text.text).toContain('1234 bytes');
-    expect(text.text).toContain('8779248-report.pdf');
+    expect(text.text).toContain('5000003-report.pdf');
     // PDF is not an image -> no inline image block.
     expect(result.content).toHaveLength(1);
   });
@@ -72,7 +72,7 @@ describe('getAttachmentTool', () => {
       data: bytes,
     });
 
-    const result = await getAttachmentTool(client, { attachment_id: '8779231' });
+    const result = await getAttachmentTool(client, { attachment_id: '5000002' });
 
     expect(result.content).toHaveLength(2);
     const image = result.content[1] as { type: string; data: string; mimeType: string };
@@ -117,13 +117,13 @@ describe('ProductiveAPIClient.downloadAttachment', () => {
   it('appends the token to the file url and returns decoded bytes', async () => {
     const meta = {
       data: {
-        id: '8779248',
+        id: '5000003',
         type: 'attachments',
         attributes: {
           name: 'report.pdf',
           content_type: 'application/pdf',
           size: 5,
-          url: 'https://files.productive.io/attachments/files/008/779/248/original/report.pdf?1781846698',
+          url: 'https://files.productive.io/attachments/files/000/000/003/original/report.pdf?1',
         },
       },
     };
@@ -138,11 +138,11 @@ describe('ProductiveAPIClient.downloadAttachment', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = new ProductiveAPIClient(config);
-    const file = await client.downloadAttachment('8779248');
+    const file = await client.downloadAttachment('5000003');
 
     // Token appended with '&' because the url already has a query string.
     const downloadUrl = fetchMock.mock.calls[1][0] as string;
-    expect(downloadUrl).toContain('?1781846698&token=secret-token');
+    expect(downloadUrl).toContain('?1&token=secret-token');
     expect(file.name).toBe('report.pdf');
     expect(file.contentType).toBe('application/pdf');
     expect(Array.from(file.data)).toEqual([1, 2, 3, 4, 5]);
