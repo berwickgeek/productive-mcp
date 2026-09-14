@@ -132,7 +132,7 @@ describe('listCommentsTool - null comment bodies', () => {
     });
     const client = { listComments } as unknown as ProductiveAPIClient;
 
-    const result = await listCommentsTool(client, { task_id: '18263163' });
+    const result = await listCommentsTool(client, { task_id: '1000004' });
 
     const text = result.content[0].text;
     expect(text).toContain('Comments (2)');
@@ -153,31 +153,31 @@ describe('listCommentsTool - attachments', () => {
         updated_at: '2026-06-10T10:00:00Z',
       },
       relationships: {
-        attachments: { data: [{ id: '8779231', type: 'attachments' }] },
+        attachments: { data: [{ id: '5000002', type: 'attachments' }] },
       },
     };
     const listComments = vi.fn().mockResolvedValue({
       data: [comment],
       included: [
         {
-          id: '8779231',
+          id: '5000002',
           type: 'attachments',
           attributes: {
             name: 'image.png',
             content_type: 'image/png',
             size: 7035,
-            url: 'https://files.productive.io/attachments/files/008/779/231/original/image.png?1781846603',
+            url: 'https://files.productive.io/attachments/files/000/000/002/original/image.png?1',
           },
         },
       ],
     });
     const client = { listComments } as unknown as ProductiveAPIClient;
 
-    const result = await listCommentsTool(client, { task_id: '18263163' });
+    const result = await listCommentsTool(client, { task_id: '1000004' });
 
     const text = result.content[0].text;
     expect(text).toContain('Attachments (1)');
-    expect(text).toContain('ID 8779231');
+    expect(text).toContain('ID 5000002');
     expect(text).toContain('image.png');
     expect(text).toContain('image/png');
     expect(text).toContain('7035 bytes');

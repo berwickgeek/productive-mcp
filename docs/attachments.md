@@ -22,8 +22,6 @@ Per the Productive docs (https://developer.productive.io/working_with_attachment
 
 Token-in-URL is the official method, but the tokenised URL must never reach the model or the logs. Discovery tools return only the bare `url`. The download tool builds the tokenised URL internally, fetches server-side, and returns only a local file path or an inline image. Redact `?token=` from error logs; `client.ts` `makeRequest` logs the URL in its catch block, so keep that redaction in place.
 
-## Test fixtures (organisation 35421)
+## Test fixtures
 
-- Task 18499505 "Test image attachment": attachment 8779231 (image/png)
-- Task 18499514 "Test pdf attachment": attachment 8779248 (application/pdf)
-- Task 18499535 "Test excel attachment": attachment 8779254 (xlsx)
+Attachment handling is easiest to verify against three throwaway tasks in your own organisation, one each with an image, a PDF and a spreadsheet attached. Keep their task and attachment ids out of this repository: it is public, so record them in a local untracked note instead.

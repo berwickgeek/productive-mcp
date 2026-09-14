@@ -161,8 +161,8 @@ API_ENDPOINTS:
       - NAME: filter[company_id]
         TYPE: integer
         FORMAT: plain integer (NOT array notation)
-        EXAMPLE_CORRECT: "filter[company_id]=793189"
-        EXAMPLE_WRONG: "filter[company_id]=[793189]"
+        EXAMPLE_CORRECT: "filter[company_id]=600001"
+        EXAMPLE_WRONG: "filter[company_id]=[600001]"
     SORT_OPTIONS: ["name", "created_at", "updated_at"]
     PAGINATION:
       - PARAM: page[number]

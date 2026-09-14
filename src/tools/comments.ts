@@ -113,7 +113,7 @@ export async function addTaskCommentTool(
 
 export const addTaskCommentDefinition = {
   name: 'add_task_comment',
-  description: 'Add a comment to a task in Productive.io. Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Mentions are automatically resolved to notify the mentioned person. Set hidden to true to post an internal comment that is not visible to clients in the client portal (hidden comments are not available in internal projects).',
+  description: 'Add a comment to a task in Productive.io. Supports HTML formatting and @mentions (e.g. @Alex Morgan). Mentions are automatically resolved to notify the mentioned person. Set hidden to true to post an internal comment that is not visible to clients in the client portal (hidden comments are not available in internal projects).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -123,7 +123,7 @@ export const addTaskCommentDefinition = {
       },
       comment: {
         type: 'string',
-        description: 'Comment content (required). Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Tags: <div>, <p>, <strong>, <em>, <ul>, <li>, <a href="">.',
+        description: 'Comment content (required). Supports HTML formatting and @mentions (e.g. @Alex Morgan). Tags: <div>, <p>, <strong>, <em>, <ul>, <li>, <a href="">.',
       },
       hidden: {
         type: 'boolean',
@@ -313,7 +313,7 @@ export async function updateCommentTool(
 
 export const updateCommentDefinition = {
   name: 'update_comment',
-  description: 'Update the body of an existing comment in Productive.io. Supports @mentions (e.g. @Jarrod Lawson) which are automatically resolved.',
+  description: 'Update the body of an existing comment in Productive.io. Supports @mentions (e.g. @Alex Morgan) which are automatically resolved.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -323,7 +323,7 @@ export const updateCommentDefinition = {
       },
       body: {
         type: 'string',
-        description: 'The new comment body content (required). Supports HTML formatting and @mentions (e.g. @Jarrod Lawson).',
+        description: 'The new comment body content (required). Supports HTML formatting and @mentions (e.g. @Alex Morgan).',
       },
     },
     required: ['comment_id', 'body'],

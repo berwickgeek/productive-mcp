@@ -16,10 +16,10 @@ import { ProductiveAPIClient, ProductiveApiError } from '../../api/client.js';
 /** What Productive echoes back. The tool formats this, so it needs the same shape every time. */
 const updated = {
   data: {
-    id: '161683643',
+    id: '8000001',
     type: 'time_entries',
     attributes: { date: '2026-09-07', time: 90, billable_time: 90, note: 'Consolidated support work' },
-    relationships: { service: { data: { id: '15265381' } }, task: { data: { id: '19957563' } } },
+    relationships: { service: { data: { id: '7000001' } }, task: { data: { id: '1000002' } } },
   },
 };
 
@@ -49,29 +49,29 @@ describe('updateTimeEntryTool - patch payload', () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
     await updateTimeEntryTool(client, {
-      time_entry_id: '161683643',
+      time_entry_id: '8000001',
       note: 'Consolidated support work',
     });
 
-    expect(updateTimeEntry).toHaveBeenCalledWith('161683643', expect.anything());
+    expect(updateTimeEntry).toHaveBeenCalledWith('8000001', expect.anything());
     expect(attributesSent(updateTimeEntry)).toEqual({ note: 'Consolidated support work' });
   });
 
   it('sends the id and type JSON:API needs on a PATCH body', async () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
-    await updateTimeEntryTool(client, { time_entry_id: '161683643', time: '1.5h' });
+    await updateTimeEntryTool(client, { time_entry_id: '8000001', time: '1.5h' });
 
     expect(updateTimeEntry.mock.calls[0][1].data).toMatchObject({
       type: 'time_entries',
-      id: '161683643',
+      id: '8000001',
     });
   });
 
   it('converts time to minutes and treats it as a replacement, not an increment', async () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
-    await updateTimeEntryTool(client, { time_entry_id: '161683643', time: '1.5h' });
+    await updateTimeEntryTool(client, { time_entry_id: '8000001', time: '1.5h' });
 
     expect(attributesSent(updateTimeEntry).time).toBe(90);
   });
@@ -81,7 +81,7 @@ describe('updateTimeEntryTool - patch payload', () => {
   it('sets billable time to match when time is supplied without it', async () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
-    await updateTimeEntryTool(client, { time_entry_id: '161683643', time: '120m' });
+    await updateTimeEntryTool(client, { time_entry_id: '8000001', time: '120m' });
 
     expect(attributesSent(updateTimeEntry)).toEqual({ time: 120, billable_time: 120 });
   });
@@ -90,7 +90,7 @@ describe('updateTimeEntryTool - patch payload', () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
     await updateTimeEntryTool(client, {
-      time_entry_id: '161683643',
+      time_entry_id: '8000001',
       time: '2h',
       billable_time: '90m',
     });
@@ -102,7 +102,7 @@ describe('updateTimeEntryTool - patch payload', () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
     await updateTimeEntryTool(client, {
-      time_entry_id: '161683643',
+      time_entry_id: '8000001',
       note: 'Rewrote the note after consolidating',
     });
 
@@ -112,7 +112,7 @@ describe('updateTimeEntryTool - patch payload', () => {
   it('resolves "today" and "yesterday" the way create_time_entry does', async () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
-    await updateTimeEntryTool(client, { time_entry_id: '161683643', date: 'today' });
+    await updateTimeEntryTool(client, { time_entry_id: '8000001', date: 'today' });
 
     expect(attributesSent(updateTimeEntry).date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
@@ -120,10 +120,10 @@ describe('updateTimeEntryTool - patch payload', () => {
   it('moves the entry to another service through the relationship, not an attribute', async () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
-    await updateTimeEntryTool(client, { time_entry_id: '161683643', service_id: '15265381' });
+    await updateTimeEntryTool(client, { time_entry_id: '8000001', service_id: '7000001' });
 
     expect(updateTimeEntry.mock.calls[0][1].data.relationships).toEqual({
-      service: { data: { id: '15265381', type: 'services' } },
+      service: { data: { id: '7000001', type: 'services' } },
     });
   });
 
@@ -131,10 +131,10 @@ describe('updateTimeEntryTool - patch payload', () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
     await updateTimeEntryTool(client, {
-      time_entry_id: '161683643',
+      time_entry_id: '8000001',
       time: '30m',
       // Not part of the schema. Passing it must not leak a task relationship into the patch.
-      task_id: '19957563',
+      task_id: '1000002',
     });
 
     expect(updateTimeEntry.mock.calls[0][1].data.relationships).toBeUndefined();
@@ -145,7 +145,7 @@ describe('updateTimeEntryTool - argument checking', () => {
   it('rejects a call that supplies nothing but the id, rather than sending an empty patch', async () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
-    const code = await codeOf(() => updateTimeEntryTool(client, { time_entry_id: '161683643' }));
+    const code = await codeOf(() => updateTimeEntryTool(client, { time_entry_id: '8000001' }));
 
     expect(code).toBe(ErrorCode.InvalidParams);
     expect(updateTimeEntry).not.toHaveBeenCalled();
@@ -155,7 +155,7 @@ describe('updateTimeEntryTool - argument checking', () => {
     const { updateTimeEntry, client } = clientThatUpdates();
 
     const code = await codeOf(() =>
-      updateTimeEntryTool(client, { time_entry_id: '161683643', time: 'half a day' })
+      updateTimeEntryTool(client, { time_entry_id: '8000001', time: 'half a day' })
     );
 
     expect(code).toBe(ErrorCode.InvalidParams);
@@ -166,7 +166,7 @@ describe('updateTimeEntryTool - argument checking', () => {
     const { client } = clientThatUpdates();
 
     const code = await codeOf(() =>
-      updateTimeEntryTool(client, { time_entry_id: '161683643', date: '07/09/2026' })
+      updateTimeEntryTool(client, { time_entry_id: '8000001', date: '07/09/2026' })
     );
 
     expect(code).toBe(ErrorCode.InvalidParams);
@@ -177,7 +177,7 @@ describe('updateTimeEntryTool - argument checking', () => {
 
     let caught: any;
     try {
-      await updateTimeEntryTool(client, { time_entry_id: '161683643', note: 'too short' });
+      await updateTimeEntryTool(client, { time_entry_id: '8000001', note: 'too short' });
     } catch (err) {
       caught = err;
     }
@@ -192,7 +192,7 @@ describe('updateTimeEntryTool - error mapping', () => {
     return { updateTimeEntry: vi.fn().mockRejectedValue(error) } as unknown as ProductiveAPIClient;
   }
 
-  const args = { time_entry_id: '161683643', time: '30m' };
+  const args = { time_entry_id: '8000001', time: '30m' };
 
   it('maps a 422 to InvalidParams and keeps the source.pointer in the message', async () => {
     const apiError = new ProductiveApiError(

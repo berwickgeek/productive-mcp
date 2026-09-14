@@ -4,6 +4,17 @@ An MCP server exposing the Productive.io API over stdio. Plain TypeScript compil
 and run under Node. **No React, no Next.js, no JSX, no browser, no bundler.** If you find
 yourself reaching for a UI convention here, you are in the wrong repo.
 
+## Public repository
+
+**This repository is public on GitHub.** Nothing that identifies a Productive organisation, its
+customers or its people goes into it: no client or company names, no people's names, no real
+task, comment, person, project, company, workflow status or attachment ids, no attachment URLs
+or filenames from a real organisation, and no paths that name a consuming project. That covers
+code, tests, fixtures, docs, scripts, commit messages and pull request descriptions. Use
+obviously fake values in tests (ids like `1000001`, names like `Alex Morgan`, `example.com`
+addresses) and describe live-API findings without the ids they were found on. Git history is
+permanent and force-push is blocked, so scrub before committing, not after.
+
 ## Commands
 
 ```bash
@@ -91,8 +102,8 @@ Verify with `node scripts/verify-list-comments.mjs <task_id>`. A second clone at
 one; it has been removed and this clone is the only one.
 
 **`create_task` with `status: "open"` lands the task in Pending, not Open,** and the tool's own
-success echo reports the wrong status. Confirmed on task 19996350 (2026-09-08). Callers follow
-with `update_task_status` (`status_name: "Open"`). Fixable at source in the tool.
+success echo reports the wrong status. Confirmed against the live API (2026-09-08). Callers
+follow with `update_task_status` (`status_name: "Open"`). Fixable at source in the tool.
 
 **`list_comments` returns oldest-first, default cap about 30, no sort or page parameter.** On a
 long thread the newest comments fall off the end, so a poller sees only old ones and reports
@@ -151,7 +162,7 @@ straight to the API, so `"me"` there is not a filter. Use `my_tasks` to list you
 ## Registration
 
 Register this server per project, not globally: the token is a live production credential and a
-global entry would hand it to every session on the machine. `lpbwa-support/.mcp.json` runs it
-through `cmd /c "cd /d C:\VSCode\productive-mcp && node build\index.js"` so that dotenv finds
+global entry would hand it to every session on the machine. The consuming project's `.mcp.json`
+runs it through `cmd /c "cd /d <path-to-this-repo> && node build\index.js"` so that dotenv finds
 this repo's `.env`; `config()` in `src/config/index.ts` loads from the working directory, so the
 working directory must be this repo.
