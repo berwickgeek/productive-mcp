@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { Config } from '../config/index.js';
 import { toMcpError } from '../utils/errors.js';
+import { summariseBody } from '../utils/summary.js';
 import { ProductiveIncludedResource } from '../api/types.js';
 
 function resolveWorkflowStatus(task: { relationships?: Record<string, any> }, included?: ProductiveIncludedResource[]): string | undefined {
@@ -56,11 +57,14 @@ export async function myTasksTool(
       const statusIcon = task.attributes.status === 2 ? '✓' : '○';
       const statusText = workflowStatusName || fallbackStatus;
       
-      return `${statusIcon} ${task.attributes.title} (ID: ${task.id})
-  Status: ${statusText}
-  ${task.attributes.due_date ? `Due: ${task.attributes.due_date}` : 'No due date'}
-  ${projectId ? `Project ID: ${projectId}` : ''}
-  ${task.attributes.description ? `Description: ${task.attributes.description}` : ''}`;
+      const summaryLine = summariseBody(task.attributes.description);
+      return [
+        `${statusIcon} ${task.attributes.title} (ID: ${task.id})`,
+        `  Status: ${statusText}`,
+        task.attributes.due_date ? `  Due: ${task.attributes.due_date}` : '  No due date',
+        projectId ? `  Project ID: ${projectId}` : '',
+        summaryLine ? `  Description: ${summaryLine}` : '',
+      ].filter(Boolean).join('\n');
     }).join('\n\n');
     
     const summary = `You have ${response.data.length} task${response.data.length !== 1 ? 's' : ''} assigned to you${response.meta?.total_count ? ` (showing ${response.data.length} of ${response.meta.total_count})` : ''}:\n\n${tasksText}`;

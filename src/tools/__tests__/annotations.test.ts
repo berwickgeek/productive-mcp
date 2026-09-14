@@ -41,8 +41,8 @@ describe('annotation coverage', () => {
   });
 
   it('covers the whole surface', () => {
-    expect(names.length).toBe(72);
-    expect(Object.keys(TOOL_ANNOTATIONS)).toHaveLength(72);
+    expect(names.length).toBe(73);
+    expect(Object.keys(TOOL_ANNOTATIONS)).toHaveLength(73);
   });
 
   it('gives every tool a human-readable title', () => {

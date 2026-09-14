@@ -437,6 +437,8 @@ export interface ProductiveService {
     name: string;
     description?: string;
     is_active?: boolean;
+    /** False means create_time_entry against this service fails with a 422. */
+    time_tracking_enabled?: boolean;
     created_at: string;
     updated_at: string;
     [key: string]: any;

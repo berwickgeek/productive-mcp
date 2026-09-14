@@ -119,6 +119,41 @@ describe('listWorkflowStatuses request', () => {
   });
 });
 
+/**
+ * These parameters exist to collapse call loops measured in real sessions: one request for a
+ * known set of task IDs instead of one getTask each, and a service list actually scoped to a
+ * project instead of an arbitrary page of every service in the organisation.
+ */
+describe('batch and filter parameters', () => {
+  it('sends several task ids as one comma-separated id filter', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listTasks({ task_ids: ['19677709', '19587577', '19565177'] });
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/tasks');
+    expect(url.searchParams.get('filter[id]')).toBe('19677709,19587577,19565177');
+  });
+
+  it('omits the id filter when no ids were given', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listTasks({ project_id: '813033' });
+
+    expect(urlOf(spy).searchParams.has('filter[id]')).toBe(false);
+  });
+
+  it('scopes services to a project', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listServices({ project_id: '813033' });
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/services');
+    expect(url.searchParams.get('filter[project_id]')).toBe('813033');
+  });
+});
+
 describe('request headers', () => {
   it('sends auth and org headers on every request', async () => {
     const spy = stubFetch();

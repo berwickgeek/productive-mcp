@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { toMcpError } from '../utils/errors.js';
+import { summariseBody } from '../utils/summary.js';
 import { confirmField, confirmProperty, deletionPreview } from '../utils/confirm.js';
 import { ProductiveTaskUpdate, ProductiveIncludedResource } from '../api/types.js';
 import { formatAttachments } from '../utils/attachments.js';
@@ -23,6 +24,7 @@ function resolveWorkflowStatus(task: { relationships?: Record<string, any> }, in
 }
 
 const listTasksSchema = z.object({
+  task_ids: z.array(z.string()).max(200).optional(),
   project_id: z.string().optional(),
   assignee_id: z.string().optional(),
   status: z.enum(['open', 'closed']).optional(),
@@ -46,10 +48,12 @@ export async function listTasksTool(
     const params = listTasksSchema.parse(args || {});
     
     const response = await client.listTasks({
+      task_ids: params.task_ids,
       project_id: params.project_id,
       assignee_id: params.assignee_id,
       status: params.status,
-      limit: params.limit,
+      // A caller naming explicit ids wants all of them, not the first 30.
+      limit: params.task_ids?.length ? Math.max(params.task_ids.length, params.limit ?? 0) : params.limit,
     });
     
     if (!response || !response.data || response.data.length === 0) {
@@ -71,12 +75,15 @@ export async function listTasksTool(
       const assigneeDisplay = assigneeName
         ? `Assignee: ${assigneeName} (ID: ${assigneeId})`
         : assigneeId ? `Assignee ID: ${assigneeId}` : 'Unassigned';
-      return `• ${task.attributes.title} (ID: ${task.id})
-  Status: ${statusText}
-  ${task.attributes.due_date ? `Due: ${task.attributes.due_date}` : 'No due date'}
-  ${projectId ? `Project ID: ${projectId}` : ''}
-  ${assigneeDisplay}
-  ${task.attributes.description ? `Description: ${task.attributes.description}` : ''}`;
+      const summaryLine = summariseBody(task.attributes.description);
+      return [
+        `• ${task.attributes.title} (ID: ${task.id})`,
+        `  Status: ${statusText}`,
+        task.attributes.due_date ? `  Due: ${task.attributes.due_date}` : '  No due date',
+        projectId ? `  Project ID: ${projectId}` : '',
+        `  ${assigneeDisplay}`,
+        summaryLine ? `  Description: ${summaryLine}` : '',
+      ].filter(Boolean).join('\n');
     }).join('\n\n');
 
     const summary = `Found ${response.data.length} task${response.data.length !== 1 ? 's' : ''}${response.meta?.total_count ? ` (showing ${response.data.length} of ${response.meta.total_count})` : ''}:\n\n${tasksText}`;
@@ -123,11 +130,14 @@ export async function getProjectTasksTool(
       const assigneeDisplay = assigneeName
         ? `Assignee: ${assigneeName} (ID: ${assigneeId})`
         : assigneeId ? `Assignee ID: ${assigneeId}` : 'Unassigned';
-      return `• ${task.attributes.title} (ID: ${task.id})
-  Status: ${statusText}
-  ${task.attributes.due_date ? `Due: ${task.attributes.due_date}` : 'No due date'}
-  ${assigneeDisplay}
-  ${task.attributes.description ? `Description: ${task.attributes.description}` : ''}`;
+      const summaryLine = summariseBody(task.attributes.description);
+      return [
+        `• ${task.attributes.title} (ID: ${task.id})`,
+        `  Status: ${statusText}`,
+        task.attributes.due_date ? `  Due: ${task.attributes.due_date}` : '  No due date',
+        `  ${assigneeDisplay}`,
+        summaryLine ? `  Description: ${summaryLine}` : '',
+      ].filter(Boolean).join('\n');
     }).join('\n\n');
 
     const summary = `Project ${params.project_id} has ${response.data.length} task${response.data.length !== 1 ? 's' : ''}:\n\n${tasksText}`;
@@ -257,10 +267,16 @@ export async function getTaskTool(
 
 export const listTasksDefinition = {
   name: 'list_tasks',
-  description: 'Get a list of tasks from Productive.io',
+  description: 'Get a list of tasks from Productive.io. To look up several known task IDs, pass them all as task_ids in ONE call rather than calling get_task once per ID.',
   inputSchema: {
     type: 'object',
     properties: {
+      task_ids: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 200,
+        description: 'Fetch these specific task IDs in a single request. Use this instead of repeated get_task calls when you already know the IDs.',
+      },
       project_id: {
         type: 'string',
         description: 'Filter tasks by project ID',
@@ -495,6 +511,43 @@ export const createTaskDefinition = {
   },
 };
 
+/**
+ * Resolve an assignee argument to a person id.
+ *
+ * @param assigneeId - A person id, "me", or the string "null" to unassign
+ * @returns The person id, or null when the task should be unassigned
+ * @throws McpError when "me" is used without PRODUCTIVE_USER_ID configured
+ */
+export function resolveAssigneeId(
+  assigneeId: string,
+  config?: { PRODUCTIVE_USER_ID?: string }
+): string | null {
+  if (assigneeId === 'me') {
+    if (!config?.PRODUCTIVE_USER_ID) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Cannot use "me" reference - PRODUCTIVE_USER_ID is not configured in environment'
+      );
+    }
+    return config.PRODUCTIVE_USER_ID;
+  }
+  if (assigneeId === 'null') return null;
+  return assigneeId;
+}
+
+/** The JSON:API body that sets or clears a task's assignee. */
+export function assigneeUpdatePayload(taskId: string, assigneeId: string | null): ProductiveTaskUpdate {
+  return {
+    data: {
+      type: 'tasks',
+      id: taskId,
+      relationships: assigneeId
+        ? { assignee: { data: { id: assigneeId, type: 'people' } } }
+        : { assignee: { data: null } },
+    },
+  };
+}
+
 const updateTaskAssignmentSchema = z.object({
   task_id: z.string().min(1, 'Task ID is required'),
   assignee_id: z.string().describe('ID of the person to assign (use "null" string to unassign)'),
@@ -508,40 +561,12 @@ export async function updateTaskAssignmentTool(
   try {
     const params = updateTaskAssignmentSchema.parse(args);
     
-    // Handle "me" reference and "null" string
-    let assigneeId: string | null = params.assignee_id;
-    if (assigneeId === 'me') {
-      if (!config?.PRODUCTIVE_USER_ID) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Cannot use "me" reference - PRODUCTIVE_USER_ID is not configured in environment'
-        );
-      }
-      assigneeId = config.PRODUCTIVE_USER_ID;
-    } else if (assigneeId === 'null') {
-      assigneeId = null;
-    }
-    
-    const taskUpdate: ProductiveTaskUpdate = {
-      data: {
-        type: 'tasks',
-        id: params.task_id,
-        relationships: assigneeId ? {
-          assignee: {
-            data: {
-              id: assigneeId,
-              type: 'people'
-            }
-          }
-        } : {
-          assignee: {
-            data: null
-          }
-        }
-      }
-    };
-    
-    const response = await client.updateTask(params.task_id, taskUpdate);
+    const assigneeId = resolveAssigneeId(params.assignee_id, config);
+
+    const response = await client.updateTask(
+      params.task_id,
+      assigneeUpdatePayload(params.task_id, assigneeId)
+    );
     
     let text = `Task assignment updated successfully!\n`;
     text += `Task: ${response.data.attributes.title} (ID: ${response.data.id})\n`;

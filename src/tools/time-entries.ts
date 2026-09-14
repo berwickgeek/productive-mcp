@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { toMcpError } from '../utils/errors.js';
+import { summariseBody } from '../utils/summary.js';
 import { ProductiveTimeEntryCreate } from '../api/types.js';
 
 // Helper function to parse time input into minutes
@@ -94,7 +95,7 @@ const getProjectServicesSchema = z.object({
   limit: z.number().min(1).max(200).default(30).optional(),
 });
 
-export async function listTimeEntresTool(
+export async function listTimeEntriesTool(
   client: ProductiveAPIClient,
   args: unknown,
   config?: { PRODUCTIVE_USER_ID?: string }
@@ -159,7 +160,7 @@ export async function listTimeEntresTool(
       return `• Time Entry (ID: ${entry.id})
   Date: ${entry.attributes.date}
   Time: ${timeDisplay}${billableDisplay}
-  Note: ${entry.attributes.note || 'No note'}
+  Note: ${summariseBody(entry.attributes.note) || 'No note'}
   Person ID: ${personId || 'Unknown'}
   Service ID: ${serviceId || 'Unknown'}
   Task ID: ${taskId || 'None'}
@@ -184,6 +185,90 @@ export async function listTimeEntresTool(
   } catch (error) {
     throw toMcpError(error);
   }
+}
+
+/** One entry's worth of validated input, shared by create_time_entry and create_time_entries. */
+interface ResolvedTimeEntry {
+  date: string;
+  minutes: number;
+  billableMinutes?: number;
+  personId: string;
+  serviceId: string;
+  taskId?: string;
+  note?: string;
+}
+
+/**
+ * Resolve one raw time entry: "me" to a person id, "2.5h" to minutes, "today" to a date.
+ *
+ * @throws McpError when "me" is used without PRODUCTIVE_USER_ID configured
+ * @throws Error when the date or time string cannot be parsed
+ */
+function resolveTimeEntry(
+  raw: {
+    date: string;
+    time: string;
+    person_id: string;
+    service_id: string;
+    task_id?: string;
+    note?: string;
+    billable_time?: string;
+  },
+  config?: { PRODUCTIVE_USER_ID?: string }
+): ResolvedTimeEntry {
+  let personId = raw.person_id;
+  if (personId === 'me') {
+    if (!config?.PRODUCTIVE_USER_ID) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Cannot use "me" reference - PRODUCTIVE_USER_ID is not configured in environment'
+      );
+    }
+    personId = config.PRODUCTIVE_USER_ID;
+  }
+
+  return {
+    date: parseDate(raw.date),
+    minutes: parseTimeToMinutes(raw.time),
+    billableMinutes: raw.billable_time ? parseTimeToMinutes(raw.billable_time) : undefined,
+    personId,
+    serviceId: raw.service_id,
+    taskId: raw.task_id,
+    note: raw.note,
+  };
+}
+
+/** Build the JSON:API body for one resolved entry. */
+function timeEntryPayload(entry: ResolvedTimeEntry): ProductiveTimeEntryCreate {
+  const payload: ProductiveTimeEntryCreate = {
+    data: {
+      type: 'time_entries',
+      attributes: {
+        date: entry.date,
+        time: entry.minutes,
+        ...(entry.billableMinutes !== undefined && { billable_time: entry.billableMinutes }),
+        ...(entry.note && { note: entry.note }),
+      },
+      relationships: {
+        person: { data: { id: entry.personId, type: 'people' } },
+        service: { data: { id: entry.serviceId, type: 'services' } },
+      },
+    },
+  };
+
+  if (entry.taskId) {
+    payload.data.relationships.task = { data: { id: entry.taskId, type: 'tasks' } };
+  }
+
+  return payload;
+}
+
+/** Render minutes as "2h 30m", the form the rest of this file prints. */
+function formatMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  return `${mins}m`;
 }
 
 export async function createTimeEntryTool(
@@ -358,6 +443,175 @@ ID: ${response.data.id}`;
   }
 }
 
+const timeEntryInputSchema = z.object({
+  date: z.string().min(1, 'Date is required'),
+  time: z.string().min(1, 'Time is required'),
+  person_id: z.string().min(1, 'Person ID is required'),
+  service_id: z.string().min(1, 'Service ID is required'),
+  task_id: z.string().optional(),
+  note: z.string().min(10, 'Work description must be at least 10 characters'),
+  billable_time: z.string().optional(),
+});
+
+const createTimeEntriesSchema = z.object({
+  entries: z.array(timeEntryInputSchema).min(1, 'At least one entry is required').max(100),
+  confirm: z.boolean().optional().default(false),
+});
+
+/**
+ * Create many time entries from one call.
+ *
+ * Filing a week of timesheet one entry at a time was measured at 37 consecutive
+ * create_time_entry calls, each one a separate round trip and each one separately confirmed.
+ * This takes the whole set, shows it once for confirmation, then writes it.
+ *
+ * Productive has no bulk time-entry endpoint, so the server still issues one request per
+ * entry. What collapses is the conversation: one call and one confirmation instead of 37.
+ * Writes are therefore not atomic, and a partial failure is reported per entry rather than
+ * rolled back.
+ */
+export async function createTimeEntriesTool(
+  client: ProductiveAPIClient,
+  args: unknown,
+  config?: { PRODUCTIVE_USER_ID?: string }
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  try {
+    const params = createTimeEntriesSchema.parse(args);
+
+    // Resolve everything before writing anything, so a bad date in entry 20 is reported
+    // before entry 1 has been created.
+    const resolved = params.entries.map((raw, index) => {
+      try {
+        return resolveTimeEntry(raw, config);
+      } catch (error) {
+        if (error instanceof McpError) throw error;
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Entry ${index + 1}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+
+    const totalMinutes = resolved.reduce((sum, entry) => sum + entry.minutes, 0);
+
+    if (!params.confirm) {
+      const lines = resolved.map((entry, index) =>
+        `${index + 1}. ${entry.date}  ${formatMinutes(entry.minutes)}  service ${entry.serviceId}` +
+        `${entry.taskId ? `  task ${entry.taskId}` : '  no task'}` +
+        `${entry.note ? `\n   ${summariseBody(entry.note)}` : ''}`
+      );
+      return {
+        content: [{
+          type: 'text',
+          text: `${resolved.length} time ${resolved.length === 1 ? 'entry' : 'entries'} ready to create, ` +
+            `totalling ${formatMinutes(totalMinutes)}:\n\n` +
+            `${lines.join('\n')}\n\n` +
+            'To create them, call this tool again with the same parameters and add "confirm": true',
+        }],
+      };
+    }
+
+    const created: string[] = [];
+    const failed: string[] = [];
+
+    for (const [index, entry] of resolved.entries()) {
+      try {
+        const response = await client.createTimeEntry(timeEntryPayload(entry));
+        created.push(
+          `${index + 1}. ${entry.date}  ${formatMinutes(entry.minutes)}  entry ID ${response.data.id}` +
+          `${entry.taskId ? `  task ${entry.taskId}` : ''}`
+        );
+      } catch (error) {
+        const mapped = toMcpError(error);
+        failed.push(`${index + 1}. ${entry.date}  ${formatMinutes(entry.minutes)}  ${mapped.message}`);
+      }
+    }
+
+    let text = `Created ${created.length} of ${resolved.length} time entries.`;
+    if (created.length) text += `\n\nCreated:\n${created.join('\n')}`;
+    if (failed.length) {
+      text += `\n\nFailed (not created, safe to retry just these):\n${failed.join('\n')}`;
+    }
+
+    return { content: [{ type: 'text', text }] };
+  } catch (error) {
+    throw toMcpError(error);
+  }
+}
+
+export const createTimeEntriesDefinition = {
+  name: 'create_time_entries',
+  description: 'Log SEVERAL time entries in one call. Use this instead of calling create_time_entry repeatedly: filing a week of timesheet one entry at a time costs one round trip and one confirmation per entry. Call once with confirm omitted to review the whole set, then again with confirm true.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      entries: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 100,
+        description: 'The time entries to create',
+        items: {
+          type: 'object',
+          properties: {
+            date: {
+              type: 'string',
+              description: 'Date of the work (YYYY-MM-DD, "today", or "yesterday")',
+            },
+            time: {
+              type: 'string',
+              description: 'Time spent, e.g. "2h", "90m", "1.5"',
+            },
+            person_id: {
+              type: 'string',
+              description: 'Person the time belongs to, or "me"',
+            },
+            service_id: {
+              type: 'string',
+              description: 'Service to book the time against. It must have time tracking enabled: list_services and get_project_services show which do.',
+            },
+            task_id: {
+              type: 'string',
+              description: 'Optional task the work relates to',
+            },
+            note: {
+              type: 'string',
+              description: 'REQUIRED: what was actually done, at least 10 characters',
+            },
+            billable_time: {
+              type: 'string',
+              description: 'Optional billable time when it differs from time spent',
+            },
+          },
+          required: ['date', 'time', 'person_id', 'service_id', 'note'],
+        },
+      },
+      confirm: {
+        type: 'boolean',
+        description: 'Set to true to actually create the entries. Without it the set is described and nothing is written.',
+        default: false,
+      },
+    },
+    required: ['entries'],
+  },
+};
+
+/**
+ * Say whether a service will accept time.
+ *
+ * Booking time against a service with time tracking off fails with
+ * `422 does not have time tracking enabled`, and the only way to find out was to write the
+ * entry and have it rejected. The flag is on the service record, so it is printed here.
+ */
+function timeTrackingNote(service: { attributes: { time_tracking_enabled?: boolean } }): string {
+  if (service.attributes.time_tracking_enabled === false) {
+    return 'Time tracking: DISABLED, this service cannot accept time entries';
+  }
+  if (service.attributes.time_tracking_enabled === true) {
+    return 'Time tracking: enabled';
+  }
+  return '';
+}
+
 export async function listServicesTool(
   client: ProductiveAPIClient,
   args: unknown
@@ -381,9 +635,12 @@ export async function listServicesTool(
     
     const servicesText = response.data.map(service => {
       const companyId = service.relationships?.company?.data?.id;
-      return `• ${service.attributes.name} (ID: ${service.id})
-  ${companyId ? `Company ID: ${companyId}` : ''}
-  ${service.attributes.description ? `Description: ${service.attributes.description}` : 'No description'}`;
+      return [
+        `• ${service.attributes.name} (ID: ${service.id})`,
+        companyId ? `  Company ID: ${companyId}` : '',
+        `  ${service.attributes.description ? `Description: ${summariseBody(service.attributes.description)}` : 'No description'}`,
+        timeTrackingNote(service) ? `  ${timeTrackingNote(service)}` : '',
+      ].filter(Boolean).join('\n');
     }).join('\n\n');
     
     const summary = `Found ${response.data.length} service${response.data.length !== 1 ? 's' : ''}${response.meta?.total_count ? ` (showing ${response.data.length} of ${response.meta.total_count})` : ''}:\n\n${servicesText}`;
@@ -406,15 +663,11 @@ export async function getProjectServicesTool(
   try {
     const params = getProjectServicesSchema.parse(args);
     
-    // First get the project to verify it exists and get company info
-    const projectResponse = await client.listProjects({
-      limit: 1,
-    });
-    
-    // Then get services for the project's company
-    // Note: This is a simplified approach - in practice you might need
-    // to get the project details first to find its company
+    // This used to fetch a page of projects, discard it, then list services with no project
+    // filter at all, so it returned an arbitrary slice of every service in the organisation.
+    // Project 813033 has 11 services; the tool was returning a page of the 271 that exist.
     const response = await client.listServices({
+      project_id: params.project_id,
       limit: params.limit,
     });
     
@@ -429,10 +682,13 @@ export async function getProjectServicesTool(
     
     const servicesText = response.data.map(service => {
       const companyId = service.relationships?.company?.data?.id;
-      
-      return `• ${service.attributes.name} (ID: ${service.id})
-  ${companyId ? `Company ID: ${companyId}` : ''}
-  ${service.attributes.description ? `Description: ${service.attributes.description}` : 'No description'}`;
+
+      return [
+        `• ${service.attributes.name} (ID: ${service.id})`,
+        companyId ? `  Company ID: ${companyId}` : '',
+        `  ${service.attributes.description ? `Description: ${summariseBody(service.attributes.description)}` : 'No description'}`,
+        timeTrackingNote(service) ? `  ${timeTrackingNote(service)}` : '',
+      ].filter(Boolean).join('\n');
     }).join('\n\n');
     
     const summary = `Services available for project ${params.project_id} (${response.data.length} service${response.data.length !== 1 ? 's' : ''}):\n\n${servicesText}`;
@@ -645,9 +901,12 @@ export async function listDealServicesTool(
     }
     
     const servicesText = response.data.map(service => {
-      return `• Service (ID: ${service.id})
-  Name: ${service.attributes.name || 'Unnamed Service'}
-  ${service.attributes.description ? `Description: ${service.attributes.description}` : 'No description'}`;
+      return [
+        `• Service (ID: ${service.id})`,
+        `  Name: ${service.attributes.name || 'Unnamed Service'}`,
+        `  ${service.attributes.description ? `Description: ${summariseBody(service.attributes.description)}` : 'No description'}`,
+        timeTrackingNote(service) ? `  ${timeTrackingNote(service)}` : '',
+      ].filter(Boolean).join('\n');
     }).join('\n\n');
     
     const summary = `Found ${response.data.length} service${response.data.length !== 1 ? 's' : ''} for deal/budget ${params.deal_id}:\n\n${servicesText}`;

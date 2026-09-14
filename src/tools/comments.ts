@@ -6,6 +6,7 @@ import { confirmField, confirmProperty, deletionPreview, excerpt } from '../util
 import { ProductiveIncludedResource } from '../api/types.js';
 import { resolveMentions, MentionResolutionResult } from '../utils/mentions.js';
 import { formatAttachments } from '../utils/attachments.js';
+import { resolveAssigneeId, assigneeUpdatePayload } from './tasks.js';
 
 type ToolResult = { content: Array<{ type: string; text: string }> };
 
@@ -49,11 +50,13 @@ const addTaskCommentSchema = z.object({
   task_id: z.string().min(1, 'Task ID is required'),
   comment: z.string().min(1, 'Comment text is required'),
   hidden: z.boolean().optional(),
+  assignee_id: z.string().optional().describe('Reassign the task in the same call. A person ID, "me", or "null" to unassign.'),
 });
 
 export async function addTaskCommentTool(
   client: ProductiveAPIClient,
-  args: unknown
+  args: unknown,
+  config?: { PRODUCTIVE_USER_ID?: string }
 ): Promise<ToolResult> {
   try {
     const params = addTaskCommentSchema.parse(args);
@@ -100,6 +103,20 @@ export async function addTaskCommentTool(
     }
     text += formatMentionFeedback(mentionResult);
 
+    // Replying and handing the task back was measured as two calls, 80 times over. The comment
+    // is already posted by this point, so a failure here is reported without discarding it.
+    if (params.assignee_id !== undefined) {
+      const assigneeId = resolveAssigneeId(params.assignee_id, config);
+      try {
+        await client.updateTask(params.task_id, assigneeUpdatePayload(params.task_id, assigneeId));
+        text += assigneeId
+          ? `\nReassigned to: Person ID ${assigneeId}${params.assignee_id === 'me' ? ' (me)' : ''}`
+          : `\nTask is now unassigned`;
+      } catch (error) {
+        text += `\nComment posted, but reassignment FAILED: ${toMcpError(error).message}`;
+      }
+    }
+
     return {
       content: [{
         type: 'text',
@@ -113,7 +130,7 @@ export async function addTaskCommentTool(
 
 export const addTaskCommentDefinition = {
   name: 'add_task_comment',
-  description: 'Add a comment to a task in Productive.io. Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Mentions are automatically resolved to notify the mentioned person. Set hidden to true to post an internal comment that is not visible to clients in the client portal (hidden comments are not available in internal projects).',
+  description: 'Add a comment to a task in Productive.io, optionally reassigning it in the same call via assignee_id. Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Mentions are automatically resolved to notify the mentioned person. Set hidden to true to post an internal comment that is not visible to clients in the client portal (hidden comments are not available in internal projects).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -128,6 +145,10 @@ export const addTaskCommentDefinition = {
       hidden: {
         type: 'boolean',
         description: 'When true, posts a hidden (internal) comment that is not visible to clients in the client portal. Defaults to false. Note: hidden comments are not available in internal projects.',
+      },
+      assignee_id: {
+        type: 'string',
+        description: 'Reassign the task as part of this call: a person ID, "me", or "null" to unassign. Use this instead of following up with update_task_assignment.',
       },
     },
     required: ['task_id', 'comment'],
