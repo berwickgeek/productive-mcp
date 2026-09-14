@@ -29,7 +29,7 @@ src/
 │   ├── client.ts     # ProductiveAPIClient: ALL HTTP goes through this
 │   └── types.ts      # JSON:API response shapes
 ├── tools/            # one file per domain (tasks, comments, pages, todos, ...)
-│   └── annotations.ts  # the behaviour-hint table for all 72 tools
+│   └── annotations.ts  # the behaviour-hint table for all 73 tools
 ├── utils/            # errors.ts, confirm.ts, attachments.ts, html.ts, mentions.ts
 ├── config/           # env validation
 └── prompts/
@@ -96,6 +96,15 @@ the gate is a speed bump, not authorisation.
   wins. Server-level routing rules belong in `server-instructions.ts`.
 - Comment and description bodies are HTML. Mentions are inline JSON blobs (`@[{...}]`);
   `src/utils/mentions.ts` renders them.
+- **A list tool never prints a full body.** Run it through `summariseBody`
+  (`src/utils/summary.ts`), which flattens the HTML to one truncated line. A list that
+  embeds every record's description does not degrade, it fails: the client rejects the
+  whole result before the model sees it, so the call returns nothing. `list_tasks`,
+  `my_tasks` and `get_project_tasks` all did exactly that on a real project. Detail tools
+  (`get_task`, `get_task_overview`, `get_comment`) keep the full body.
+- Prefer one call over a loop. Where a caller would otherwise repeat a tool per ID, the
+  tool takes an array: `list_tasks` `task_ids`, `get_attachment` `attachment_ids`,
+  `create_time_entries`. Routing advice that says so belongs in `server-instructions.ts`.
 - Semantic commits: `feat:`, `fix:`, `refactor:`, `test:`, `ci:`, `chore:`.
 
 ## Testing
@@ -116,5 +125,6 @@ Tests must pass with no credentials. CI runs them with none, deliberately.
 the `"me"` shorthand), `PRODUCTIVE_API_BASE_URL` and `PRODUCTIVE_ATTACHMENT_DIR` are optional.
 
 `"me"` is resolved per-tool, not centrally. Only `create_task`, `update_task_assignment`,
-`create_time_entry` and `list_time_entries` honour it. `list_tasks` forwards `assignee_id`
-straight to the API, so `"me"` there is not a filter. Use `my_tasks` to list your own tasks.
+`add_task_comment` (as `assignee_id`), `create_time_entry`, `create_time_entries` and
+`list_time_entries` honour it. `list_tasks` forwards `assignee_id` straight to the API, so
+`"me"` there is not a filter. Use `my_tasks` to list your own tasks.
