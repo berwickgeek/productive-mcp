@@ -225,4 +225,30 @@ describe('listCommentsTool - visibility, draft and edit flags', () => {
     expect(text).toContain('Draft: false');
     expect(text).not.toContain('Edited:');
   });
+
+  it('prints Updated on every comment, including one updated with no edited_at', async () => {
+    const updatedOnly: ProductiveComment = {
+      id: '2002',
+      type: 'comments',
+      attributes: {
+        body: 'Changed text, no edited_at',
+        commentable_type: 'task',
+        created_at: '2026-01-01T09:00:00.000+02:00',
+        updated_at: '2026-01-01T09:15:30.123+02:00',
+        hidden: true,
+      },
+    };
+    const listComments = vi.fn().mockResolvedValue({
+      data: [makeListedComment('7', 'Visible note'), updatedOnly],
+    });
+    const client = { listComments } as unknown as ProductiveAPIClient;
+
+    const result = await listCommentsTool(client, { task_id: '1001' });
+
+    const text = result.content[0].text;
+    expect(text).toContain('Updated: 2026-06-10T10:00:00Z');
+    expect(text).toContain('Updated: 2026-01-01T09:15:30.123+02:00');
+    expect(text.match(/^ {2}Updated: /gm)).toHaveLength(2);
+    expect(text).not.toContain('Edited:');
+  });
 });
