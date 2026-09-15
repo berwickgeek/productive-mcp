@@ -3,7 +3,7 @@
  *
  * A list tool that prints every record's full body does not degrade gracefully: it works on a
  * small project and returns nothing at all on a large one, because the client rejects the
- * result before the model sees it. Measured against project 813033, `list_tasks` at limit 200
+ * result before the model sees it. Measured against a real project, `list_tasks` at limit 200
  * returned 172,524 characters, 119,169 of them (69%) task descriptions, and the call failed.
  * `list_time_entries` for one person for one month returned 136,267 characters, 94% of them
  * note bodies.

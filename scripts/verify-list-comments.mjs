@@ -1,10 +1,14 @@
-// One-off verification: spawn the built MCP server and call list_comments
-// for a task whose thread previously crashed with a null-body comment.
+// One-off verification: spawn the built MCP server and call list_comments for one task.
 // Usage: node scripts/verify-list-comments.mjs <task_id>
+// The task id is required and deliberately has no default: this repository is public.
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-const taskId = process.argv[2] ?? '18263163';
+const taskId = process.argv[2];
+if (!taskId) {
+  console.error('Usage: node scripts/verify-list-comments.mjs <task_id>');
+  process.exit(1);
+}
 const mcpConfig = JSON.parse(readFileSync(new URL('../.mcp.json', import.meta.url), 'utf8'));
 const { env } = mcpConfig.mcpServers.productive;
 

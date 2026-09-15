@@ -44,11 +44,11 @@ describe('listTasks request', () => {
   it('sends the parent_task_id filter that list_subtasks depends on', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).listTasks({ parent_task_id: '19300600' });
+    await new ProductiveAPIClient(config).listTasks({ parent_task_id: '1000001' });
 
     const url = urlOf(spy);
     expect(url.pathname).toBe('/tasks');
-    expect(url.searchParams.get('filter[parent_task_id]')).toBe('19300600');
+    expect(url.searchParams.get('filter[parent_task_id]')).toBe('1000001');
     expect(url.searchParams.get('include')).toBe('assignee,workflow_status');
   });
 
@@ -65,10 +65,10 @@ describe('listTasks request', () => {
   it('omits filters that were not asked for', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).listTasks({ project_id: '813033' });
+    await new ProductiveAPIClient(config).listTasks({ project_id: '400001' });
 
     const url = urlOf(spy);
-    expect(url.searchParams.get('filter[project_id]')).toBe('813033');
+    expect(url.searchParams.get('filter[project_id]')).toBe('400001');
     expect(url.searchParams.has('filter[parent_task_id]')).toBe(false);
     expect(url.searchParams.has('filter[assignee_id]')).toBe(false);
   });
@@ -78,17 +78,17 @@ describe('getProject request', () => {
   it('hits the projects collection with the requested include', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).getProject('813033', 'workflow');
+    await new ProductiveAPIClient(config).getProject('400001', 'workflow');
 
     const url = urlOf(spy);
-    expect(url.pathname).toBe('/projects/813033');
+    expect(url.pathname).toBe('/projects/400001');
     expect(url.searchParams.get('include')).toBe('workflow');
   });
 
   it('omits the include entirely when none is given', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).getProject('813033');
+    await new ProductiveAPIClient(config).getProject('400001');
 
     expect(urlOf(spy).search).toBe('');
   });
@@ -98,10 +98,10 @@ describe('getTask request', () => {
   it('hits the tasks collection with the requested include', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).getTask('19300600', 'task_list,assignee');
+    await new ProductiveAPIClient(config).getTask('1000001', 'task_list,assignee');
 
     const url = urlOf(spy);
-    expect(url.pathname).toBe('/tasks/19300600');
+    expect(url.pathname).toBe('/tasks/1000001');
     expect(url.searchParams.get('include')).toBe('task_list,assignee');
   });
 });
@@ -128,17 +128,17 @@ describe('batch and filter parameters', () => {
   it('sends several task ids as one comma-separated id filter', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).listTasks({ task_ids: ['19677709', '19587577', '19565177'] });
+    await new ProductiveAPIClient(config).listTasks({ task_ids: ['1000001', '1000002', '1000003'] });
 
     const url = urlOf(spy);
     expect(url.pathname).toBe('/tasks');
-    expect(url.searchParams.get('filter[id]')).toBe('19677709,19587577,19565177');
+    expect(url.searchParams.get('filter[id]')).toBe('1000001,1000002,1000003');
   });
 
   it('omits the id filter when no ids were given', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).listTasks({ project_id: '813033' });
+    await new ProductiveAPIClient(config).listTasks({ project_id: '400001' });
 
     expect(urlOf(spy).searchParams.has('filter[id]')).toBe(false);
   });
@@ -146,11 +146,129 @@ describe('batch and filter parameters', () => {
   it('scopes services to a project', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).listServices({ project_id: '813033' });
+    await new ProductiveAPIClient(config).listServices({ project_id: '400001' });
 
     const url = urlOf(spy);
     expect(url.pathname).toBe('/services');
-    expect(url.searchParams.get('filter[project_id]')).toBe('813033');
+    expect(url.searchParams.get('filter[project_id]')).toBe('400001');
+  });
+});
+
+/**
+ * Productive renamed the board concept to folder. Every request below was verified against the
+ * live API on 2026-09-15: the board-named form is rejected (400 unsupported_filter on the
+ * filter, 422 "folder can't be blank" on the bodies), the folder-named form is accepted.
+ */
+describe('the board-to-folder rename', () => {
+  it('filters task lists by folder_id, not board_id', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listTaskLists({ folder_id: '900001' });
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/task_lists');
+    expect(url.searchParams.get('filter[folder_id]')).toBe('900001');
+    expect(url.searchParams.has('filter[board_id]')).toBe(false);
+  });
+
+  it('sideloads the folder so the board id is actually present', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listTaskLists();
+
+    expect(urlOf(spy).searchParams.get('include')).toBe('folder');
+  });
+
+  it('sideloads the folder on a single task list too', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).getTaskList('2000001');
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/task_lists/2000001');
+    expect(url.searchParams.get('include')).toBe('folder');
+  });
+
+  it('sends folder_id when copying a task list', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).copyTaskList({
+      name: 'Sprint 2',
+      template_id: '1',
+      project_id: '2',
+      folder_id: '900001',
+    });
+
+    const body = JSON.parse(spy.mock.calls[0][1].body as string);
+    expect(body.data.attributes.folder_id).toBe('900001');
+    expect(body.data.attributes.board_id).toBeUndefined();
+  });
+
+  it('sends folder_id when moving a task list', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).moveTaskList('2000001', '900001');
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/task_lists/2000001/move');
+    const body = JSON.parse(spy.mock.calls[0][1].body as string);
+    expect(body.data.attributes.folder_id).toBe('900001');
+    expect(body.data.attributes.board_id).toBeUndefined();
+  });
+
+  it('lists boards from the folders collection', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listBoards({ project_id: '400001' });
+
+    expect(urlOf(spy).pathname).toBe('/folders');
+  });
+});
+
+describe('updateTimeEntry request', () => {
+  it('PATCHes the single entry with the payload it was given', async () => {
+    const spy = stubFetch();
+    const payload = {
+      data: {
+        type: 'time_entries' as const,
+        id: '8000001',
+        attributes: { time: 90, billable_time: 90, note: 'Consolidated support work' },
+      },
+    };
+
+    await new ProductiveAPIClient(config).updateTimeEntry('8000001', payload);
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/time_entries/8000001');
+    const init = spy.mock.calls[0][1];
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual(payload);
+  });
+});
+
+describe('deleteTimeEntry request', () => {
+  it('DELETEs the single entry', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).deleteTimeEntry('8000002');
+
+    expect(urlOf(spy).pathname).toBe('/time_entries/8000002');
+    expect(spy.mock.calls[0][1].method).toBe('DELETE');
+  });
+
+  // The endpoint answers 204 with an empty body. Routed through makeRequest instead, the
+  // JSON parse throws and a successful delete is reported as a failure.
+  it('does not parse the empty 204 body', async () => {
+    const spy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    });
+    vi.stubGlobal('fetch', spy);
+
+    await expect(new ProductiveAPIClient(config).deleteTimeEntry('8000002')).resolves.toBeUndefined();
   });
 });
 
@@ -158,7 +276,7 @@ describe('request headers', () => {
   it('sends auth and org headers on every request', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).getProject('813033');
+    await new ProductiveAPIClient(config).getProject('400001');
 
     const headers = spy.mock.calls[0][1].headers as Record<string, string>;
     expect(headers['X-Auth-Token']).toBe('secret-token');

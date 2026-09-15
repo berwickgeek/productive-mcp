@@ -130,7 +130,7 @@ export async function addTaskCommentTool(
 
 export const addTaskCommentDefinition = {
   name: 'add_task_comment',
-  description: 'Add a comment to a task in Productive.io, optionally reassigning it in the same call via assignee_id. Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Mentions are automatically resolved to notify the mentioned person. Set hidden to true to post an internal comment that is not visible to clients in the client portal (hidden comments are not available in internal projects).',
+  description: 'Add a comment to a task in Productive.io, optionally reassigning it in the same call via assignee_id. Supports HTML formatting and @mentions (e.g. @Alex Morgan). Mentions are automatically resolved to notify the mentioned person. Set hidden to true to post an internal comment that is not visible to clients in the client portal (hidden comments are not available in internal projects).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -140,7 +140,7 @@ export const addTaskCommentDefinition = {
       },
       comment: {
         type: 'string',
-        description: 'Comment content (required). Supports HTML formatting and @mentions (e.g. @Jarrod Lawson). Tags: <div>, <p>, <strong>, <em>, <ul>, <li>, <a href="">.',
+        description: 'Comment content (required). Supports HTML formatting and @mentions (e.g. @Alex Morgan). Tags: <div>, <p>, <strong>, <em>, <ul>, <li>, <a href="">.',
       },
       hidden: {
         type: 'boolean',
@@ -188,8 +188,13 @@ export async function listCommentsTool(
       const pinned = comment.attributes.pinned_at ? ' [PINNED]' : '';
       const body = truncateBody(comment.attributes.body);
       const attachments = formatAttachments(comment.relationships, response.included, '  ');
+      // Visibility, draft state and change times let a poller classify a thread from this one call.
+      // Editing keeps a comment's id, so a changed timestamp is the only sign an old comment changed.
+      // Updated is printed on every comment because the API does not reliably set edited_at when
+      // a comment's text is edited; updated_at does move, though also on saves that change nothing.
+      const edited = comment.attributes.edited_at ? `\n  Edited: ${comment.attributes.edited_at}` : '';
 
-      return `- Comment ID: ${comment.id}${pinned}\n  By: ${creatorName}\n  Date: ${comment.attributes.created_at}\n  Body: ${body}${attachments}`;
+      return `- Comment ID: ${comment.id}${pinned}\n  By: ${creatorName}\n  Date: ${comment.attributes.created_at}\n  Hidden: ${comment.attributes.hidden ?? false}\n  Draft: ${comment.attributes.draft ?? false}\n  Updated: ${comment.attributes.updated_at}${edited}\n  Body: ${body}${attachments}`;
     }).join('\n\n');
 
     return {
@@ -331,7 +336,7 @@ export async function updateCommentTool(
 
 export const updateCommentDefinition = {
   name: 'update_comment',
-  description: 'Update the body of an existing comment in Productive.io. Supports @mentions (e.g. @Jarrod Lawson) which are automatically resolved.',
+  description: 'Update the body of an existing comment in Productive.io. Supports @mentions (e.g. @Alex Morgan) which are automatically resolved.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -341,7 +346,7 @@ export const updateCommentDefinition = {
       },
       body: {
         type: 'string',
-        description: 'The new comment body content (required). Supports HTML formatting and @mentions (e.g. @Jarrod Lawson).',
+        description: 'The new comment body content (required). Supports HTML formatting and @mentions (e.g. @Alex Morgan).',
       },
     },
     required: ['comment_id', 'body'],

@@ -12,7 +12,7 @@ import { ProductiveAPIClient, ProductiveApiError } from '../../api/client.js';
 const validArgs = {
   date: '2026-06-20',
   time: '30m',
-  person_id: '698785',
+  person_id: '300001',
   service_id: '456',
   task_id: '789',
   note: 'Worked on the attachment download feature',

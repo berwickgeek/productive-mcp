@@ -394,14 +394,8 @@ export async function createTaskTool(
       };
     }
     
-    if (params.board_id) {
-      taskData.data.relationships.board = {
-        data: {
-          id: params.board_id,
-          type: 'boards' as const,
-        },
-      };
-    }
+    // board_id is deliberately not sent. A task has no board (now folder) relationship:
+    // the API ignores the key and places the task by task_list, which it requires.
     
     if (params.task_list_id) {
       taskData.data.relationships.task_list = {
@@ -435,9 +429,6 @@ export async function createTaskTool(
     }
     if (params.project_id) {
       text += `\nProject ID: ${params.project_id}`;
-    }
-    if (params.board_id) {
-      text += `\nBoard ID: ${params.board_id}`;
     }
     if (params.task_list_id) {
       text += `\nTask List ID: ${params.task_list_id}`;
@@ -487,7 +478,7 @@ export const createTaskDefinition = {
       },
       board_id: {
         type: 'string',
-        description: 'ID of the board to add the task to',
+        description: 'Accepted but ignored: the API places a task by task_list_id, not by board. Pass task_list_id instead.',
       },
       task_list_id: {
         type: 'string',

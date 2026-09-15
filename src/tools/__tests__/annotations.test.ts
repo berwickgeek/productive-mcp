@@ -23,6 +23,7 @@ const DESTRUCTIVE = [
   'delete_page',
   'delete_task',
   'delete_task_dependency',
+  'delete_time_entry',
   'delete_todo',
   'update_comment',
   'update_folder',
@@ -32,6 +33,7 @@ const DESTRUCTIVE = [
   'update_task_list',
   'update_task_sprint',
   'update_task_status',
+  'update_time_entry',
   'update_todo',
 ];
 
@@ -41,8 +43,8 @@ describe('annotation coverage', () => {
   });
 
   it('covers the whole surface', () => {
-    expect(names.length).toBe(73);
-    expect(Object.keys(TOOL_ANNOTATIONS)).toHaveLength(73);
+    expect(names.length).toBe(75);
+    expect(Object.keys(TOOL_ANNOTATIONS)).toHaveLength(75);
   });
 
   it('gives every tool a human-readable title', () => {

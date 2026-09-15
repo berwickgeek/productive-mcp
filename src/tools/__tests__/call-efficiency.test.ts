@@ -115,10 +115,10 @@ describe('add_task_comment with assignee_id', () => {
     await addTaskCommentTool(
       mockClient({ createComment, updateTask, listPeople: vi.fn() }),
       { task_id: '1', comment: 'Done', assignee_id: 'me' },
-      { PRODUCTIVE_USER_ID: '686685' }
+      { PRODUCTIVE_USER_ID: '7000001' }
     );
 
-    expect(updateTask.mock.calls[0][1].data.relationships.assignee.data.id).toBe('686685');
+    expect(updateTask.mock.calls[0][1].data.relationships.assignee.data.id).toBe('7000001');
   });
 
   it('does not touch the assignment when assignee_id is omitted', async () => {
@@ -151,7 +151,7 @@ describe('create_time_entries', () => {
   const entry = (date: string) => ({
     date,
     time: '1h',
-    person_id: '686685',
+    person_id: '7000001',
     service_id: '55',
     note: 'Did the work described here',
   });
@@ -303,9 +303,9 @@ describe('service listings flag time tracking', () => {
   it('filters the services by project rather than listing every service', async () => {
     const listServices = vi.fn().mockResolvedValue(services(true));
 
-    await getProjectServicesTool(mockClient({ listServices }), { project_id: '813033' });
+    await getProjectServicesTool(mockClient({ listServices }), { project_id: '400001' });
 
-    expect(listServices.mock.calls[0][0].project_id).toBe('813033');
+    expect(listServices.mock.calls[0][0].project_id).toBe('400001');
   });
 
   it('says nothing when the API did not report the flag', async () => {

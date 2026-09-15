@@ -4,6 +4,17 @@ An MCP server exposing the Productive.io API over stdio. Plain TypeScript compil
 and run under Node. **No React, no Next.js, no JSX, no browser, no bundler.** If you find
 yourself reaching for a UI convention here, you are in the wrong repo.
 
+## Public repository
+
+**This repository is public on GitHub.** Nothing that identifies a Productive organisation, its
+customers or its people goes into it: no client or company names, no people's names, no real
+task, comment, person, project, company, workflow status or attachment ids, no attachment URLs
+or filenames from a real organisation, and no paths that name a consuming project. That covers
+code, tests, fixtures, docs, scripts, commit messages and pull request descriptions. Use
+obviously fake values in tests (ids like `1000001`, names like `Alex Morgan`, `example.com`
+addresses) and describe live-API findings without the ids they were found on. Git history is
+permanent and force-push is blocked, so scrub before committing, not after.
+
 ## Commands
 
 ```bash
@@ -29,7 +40,7 @@ src/
 │   ├── client.ts     # ProductiveAPIClient: ALL HTTP goes through this
 │   └── types.ts      # JSON:API response shapes
 ├── tools/            # one file per domain (tasks, comments, pages, todos, ...)
-│   └── annotations.ts  # the behaviour-hint table for all 73 tools
+│   └── annotations.ts  # the behaviour-hint table for all 75 tools
 ├── utils/            # errors.ts, confirm.ts, attachments.ts, html.ts, mentions.ts
 ├── config/           # env validation
 └── prompts/
@@ -81,6 +92,35 @@ Do not plan around a rebase.
 read-only calls when testing against the real API. Destructive tools are gated (below), but
 the gate is a speed bump, not authorisation.
 
+**`npm run build` fails on Windows.** The script is `tsc && chmod +x build/index.js` and `chmod`
+does not exist in cmd or PowerShell. Run `npx tsc` directly. Then kill the stale server
+processes: every Claude Code session spawns its own instance and each keeps the old code in
+memory, so a fix can look like it did nothing.
+`Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.CommandLine -match 'productive-mcp' } | Stop-Process`.
+Verify with `node scripts/verify-list-comments.mjs <task_id>`. A second clone at
+`C:\VSCode\AI\productive-mcp` used to be what the global MCP config ran, 62 commits behind this
+one; it has been removed and this clone is the only one.
+
+**`create_task` with `status: "open"` lands the task in Pending, not Open,** and the tool's own
+success echo reports the wrong status. Confirmed against the live API (2026-09-08). Callers
+follow with `update_task_status` (`status_name: "Open"`). Fixable at source in the tool.
+
+**`list_comments` returns oldest-first, default cap about 30, no sort or page parameter.** On a
+long thread the newest comments fall off the end, so a poller sees only old ones and reports
+nothing new forever. Callers pass `limit=100` or higher. Fixable at source.
+
+**`create_time_entry` failing with `-32603 attribute is invalid` (or `422 ... [at
+data/attributes/task]`) means the `service_id` is not in the task's budget.** Productive reports
+a service mismatch as a task error. The right service is per project budget; there is no
+organisation-wide support service. Verify against a sibling task's existing entry
+(`list_time_entries task_id=<id>`) before suspecting the MCP.
+
+**Comment and description bodies render a narrow HTML whitelist.** Verified to render: `<p>`,
+`<strong>`, `<em>`, `<ul>`, `<ol>`, `<li>`, `<a href>`, `<div>`, `<code>`, `<pre>`. Verified to
+escape to literal text: `<small>`. Expect the same for `<hr>`, `<br>`, `<blockquote>`, headings
+and tables. Markdown renders as literal syntax. Escape literal angle brackets, including inside
+`<pre>`. See `docs/api-surface.md` for the rest of the API notes.
+
 ## Conventions
 
 - Destructive tools take `confirm` (defaulting to false, never `required`). The first call
@@ -128,3 +168,11 @@ the `"me"` shorthand), `PRODUCTIVE_API_BASE_URL` and `PRODUCTIVE_ATTACHMENT_DIR`
 `add_task_comment` (as `assignee_id`), `create_time_entry`, `create_time_entries` and
 `list_time_entries` honour it. `list_tasks` forwards `assignee_id` straight to the API, so
 `"me"` there is not a filter. Use `my_tasks` to list your own tasks.
+
+## Registration
+
+Register this server per project, not globally: the token is a live production credential and a
+global entry would hand it to every session on the machine. The consuming project's `.mcp.json`
+runs it through `cmd /c "cd /d <path-to-this-repo> && node build\index.js"` so that dotenv finds
+this repo's `.env`; `config()` in `src/config/index.ts` loads from the working directory, so the
+working directory must be this repo.

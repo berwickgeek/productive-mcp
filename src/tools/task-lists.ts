@@ -14,8 +14,9 @@ export async function listTaskLists(
   try {
     const params = ListTaskListsSchema.parse(args || {});
     
+    // The tool argument is still called board_id; the API calls the same thing a folder.
     const response = await client.listTaskLists({
-      board_id: params.board_id,
+      folder_id: params.board_id,
       limit: params.limit,
     });
     
@@ -37,8 +38,8 @@ export async function listTaskLists(
       if (taskList.attributes.position !== undefined) {
         text += `\nPosition: ${taskList.attributes.position}`;
       }
-      if (taskList.relationships?.board?.data?.id) {
-        text += `\nBoard ID: ${taskList.relationships.board.data.id}`;
+      if (taskList.relationships?.folder?.data?.id) {
+        text += `\nBoard ID: ${taskList.relationships.folder.data.id}`;
       }
       return text;
     }).join('\n\n');
@@ -97,10 +98,10 @@ export async function createTaskList(
           project_id: params.project_id,
         },
         relationships: {
-          board: {
+          folder: {
             data: {
               id: params.board_id,
-              type: 'boards' as const,
+              type: 'folders' as const,
             },
           },
         },
@@ -183,8 +184,8 @@ export async function getTaskList(
     if (taskList.attributes.position !== undefined) {
       text += `\nPosition: ${taskList.attributes.position}`;
     }
-    if (taskList.relationships?.board?.data?.id) {
-      text += `\nBoard ID: ${taskList.relationships.board.data.id}`;
+    if (taskList.relationships?.folder?.data?.id) {
+      text += `\nBoard ID: ${taskList.relationships.folder.data.id}`;
     }
     if (taskList.attributes.created_at) {
       text += `\nCreated at: ${taskList.attributes.created_at}`;
@@ -391,7 +392,7 @@ export async function copyTaskList(
       name: params.name,
       template_id: params.template_id,
       project_id: params.project_id,
-      board_id: params.board_id,
+      folder_id: params.board_id,
       ...(params.copy_open_tasks !== undefined && { copy_open_tasks: params.copy_open_tasks }),
       ...(params.copy_assignees !== undefined && { copy_assignees: params.copy_assignees }),
     });

@@ -35,7 +35,7 @@ function makeClient(options: StubOptions = {}) {
       },
     },
     included: options.taskIncluded ?? [
-      { id: '10', type: 'people', attributes: { first_name: 'Jay', last_name: 'McCormack' } },
+      { id: '10', type: 'people', attributes: { first_name: 'Pat', last_name: 'Kelly' } },
     ],
   });
 
@@ -131,14 +131,14 @@ describe('getTaskOverviewTool', () => {
 
   it('renders stored mention blobs as readable names', async () => {
     const blob =
-      '@[{"type":"person","id":"705374","label":"Julian Smith","avatar_url":null,"attachment_url":null,"is_done":false}]';
+      '@[{"type":"person","id":"300002","label":"Sam Taylor","avatar_url":null,"attachment_url":null,"is_done":false}]';
     const client = makeClient({
       comments: [makeComment('1', `<p>${blob} please review</p>`, '2026-08-01T09:00:00+10:00')],
     });
 
     const text = await runTool(client, { task_id: '555' });
 
-    expect(text).toContain('@Julian Smith please review');
+    expect(text).toContain('@Sam Taylor please review');
     expect(text).not.toContain('avatar_url');
   });
 
@@ -149,7 +149,7 @@ describe('getTaskOverviewTool', () => {
         attachments: { data: [{ id: '900', type: 'attachments' }] },
       },
       taskIncluded: [
-        { id: '10', type: 'people', attributes: { first_name: 'Jay', last_name: 'McCormack' } },
+        { id: '10', type: 'people', attributes: { first_name: 'Pat', last_name: 'Kelly' } },
         {
           id: '900',
           type: 'attachments',
@@ -165,7 +165,7 @@ describe('getTaskOverviewTool', () => {
         }),
       ],
       commentsIncluded: [
-        { id: '10', type: 'people', attributes: { first_name: 'Jay', last_name: 'McCormack' } },
+        { id: '10', type: 'people', attributes: { first_name: 'Pat', last_name: 'Kelly' } },
         {
           id: '901',
           type: 'attachments',
@@ -254,7 +254,7 @@ describe('getTaskOverviewTool', () => {
         project: { data: { id: '88', type: 'projects' } },
       },
       taskIncluded: [
-        { id: '10', type: 'people', attributes: { first_name: 'Jay', last_name: 'McCormack' } },
+        { id: '10', type: 'people', attributes: { first_name: 'Pat', last_name: 'Kelly' } },
         { id: '77', type: 'workflow_statuses', attributes: { name: 'In Progress' } },
         { id: '88', type: 'projects', attributes: { name: 'LNP Hub' } },
       ],
@@ -264,7 +264,7 @@ describe('getTaskOverviewTool', () => {
 
     expect(text).toContain('TASK 555: Renewal email not sending');
     expect(text).toContain('Status: In Progress');
-    expect(text).toContain('Assignee: Jay McCormack (ID: 10)');
+    expect(text).toContain('Assignee: Pat Kelly (ID: 10)');
     expect(text).toContain('Project: LNP Hub (ID: 88)');
     expect(text).toContain('Task number: 342');
     expect(text).toContain('Due: 2026-08-20');

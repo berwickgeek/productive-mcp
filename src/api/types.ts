@@ -131,9 +131,11 @@ export interface ProductiveResponse<T> {
   };
 }
 
+// Productive renamed boards to folders. The MCP tool surface still says "board", but the
+// endpoint is /folders and every record on the wire is type "folders".
 export interface ProductiveBoard {
   id: string;
-  type: 'boards';
+  type: 'folders';
   attributes: {
     name: string;
     description?: string;
@@ -169,12 +171,6 @@ export interface ProductiveTaskCreate {
           type: 'projects';
         };
       };
-      board?: {
-        data: {
-          id: string;
-          type: 'boards';
-        };
-      };
       task_list?: {
         data: {
           id: string;
@@ -203,10 +199,10 @@ export interface ProductiveTaskList {
     [key: string]: any;
   };
   relationships?: {
-    board?: {
+    folder?: {
       data: {
         id: string;
-        type: 'boards';
+        type: 'folders';
       };
     };
     [key: string]: any;
@@ -215,7 +211,7 @@ export interface ProductiveTaskList {
 
 export interface ProductiveBoardCreate {
   data: {
-    type: 'boards';
+    type: 'folders';
     attributes: {
       name: string;
       description?: string;
@@ -241,10 +237,10 @@ export interface ProductiveTaskListCreate {
       project_id: string;
     };
     relationships: {
-      board: {
+      folder: {
         data: {
           id: string;
-          type: 'boards';
+          type: 'folders';
         };
       };
     };
@@ -560,6 +556,34 @@ export interface ProductiveTimeEntryCreate {
         data: {
           id: string;
           type: 'tasks';
+        };
+      };
+    };
+  };
+}
+
+/**
+ * Time entry update payload for a PATCH to time_entries/{id}.
+ *
+ * Every field is optional: only what is supplied is changed. There is deliberately no `task`
+ * relationship here, because an entry cannot be repointed at a different task through this
+ * endpoint.
+ */
+export interface ProductiveTimeEntryUpdate {
+  data: {
+    type: 'time_entries';
+    id: string;
+    attributes?: {
+      date?: string; // ISO date format (YYYY-MM-DD)
+      time?: number; // Time in minutes
+      billable_time?: number; // Billable time in minutes
+      note?: string; // Description of work performed
+    };
+    relationships?: {
+      service?: {
+        data: {
+          id: string;
+          type: 'services';
         };
       };
     };

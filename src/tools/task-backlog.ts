@@ -31,7 +31,7 @@ export async function addToBacklog(
     let boardId: string | null = null;
     
     for (const board of boardsResponse.data) {
-      const taskListsResponse = await client.listTaskLists({ board_id: board.id });
+      const taskListsResponse = await client.listTaskLists({ folder_id: board.id });
       const backlogList = taskListsResponse.data.find(
         list => list.attributes.name.toLowerCase() === 'backlog'
       );
@@ -55,10 +55,10 @@ export async function addToBacklog(
             project_id: project_id
           },
           relationships: {
-            board: {
+            folder: {
               data: {
                 id: boardId,
-                type: 'boards'
+                type: 'folders'
               }
             }
           }
