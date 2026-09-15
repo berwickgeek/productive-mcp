@@ -18,7 +18,7 @@ import { getRecentUpdates, getRecentUpdatesTool } from './tools/recent-updates.j
 import { addTaskCommentTool, addTaskCommentDefinition, listCommentsTool, listCommentsDefinition, getCommentTool, getCommentDefinition, updateCommentTool, updateCommentDefinition, deleteCommentTool, deleteCommentDefinition, pinCommentTool, pinCommentDefinition, unpinCommentTool, unpinCommentDefinition, addCommentReactionTool, addCommentReactionDefinition } from './tools/comments.js';
 import { updateTaskStatusTool, updateTaskStatusDefinition } from './tools/task-status.js';
 import { listWorkflowStatusesTool, listWorkflowStatusesDefinition } from './tools/workflow-statuses.js';
-import { listTimeEntresTool, createTimeEntryTool, updateTimeEntryTool, deleteTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, updateTimeEntryDefinition, deleteTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition } from './tools/time-entries.js';
+import { listTimeEntriesTool, createTimeEntryTool, createTimeEntriesTool, updateTimeEntryTool, deleteTimeEntryTool, listServicesTool, getProjectServicesTool, listProjectDealsTool, listDealServicesTool, listTimeEntriesDefinition, createTimeEntryDefinition, createTimeEntriesDefinition, updateTimeEntryDefinition, deleteTimeEntryDefinition, listServicesDefinition, getProjectServicesDefinition, listProjectDealsDefinition, listDealServicesDefinition } from './tools/time-entries.js';
 import { updateTaskSprint, updateTaskSprintTool } from './tools/task-sprint.js';
 import { moveTaskToList, moveTaskToListTool } from './tools/task-list-move.js';
 import { addToBacklog, addToBacklogTool } from './tools/task-backlog.js';
@@ -68,6 +68,7 @@ export const toolDefinitions = [
   getRecentUpdatesTool,
   listTimeEntriesDefinition,
   createTimeEntryDefinition,
+  createTimeEntriesDefinition,
   updateTimeEntryDefinition,
   deleteTimeEntryDefinition,
   listProjectDealsDefinition,
@@ -180,7 +181,7 @@ export async function createServer() {
         return await updateTaskDetailsTool(apiClient, args);
         
       case 'add_task_comment':
-        return await addTaskCommentTool(apiClient, args);
+        return await addTaskCommentTool(apiClient, args, config);
         
       case 'update_task_status':
         return await updateTaskStatusTool(apiClient, args);
@@ -222,10 +223,13 @@ export async function createServer() {
         return await getRecentUpdates(apiClient, args);
         
       case 'list_time_entries':
-        return await listTimeEntresTool(apiClient, args, config);
+        return await listTimeEntriesTool(apiClient, args, config);
         
       case 'create_time_entry':
         return await createTimeEntryTool(apiClient, args, config);
+
+      case 'create_time_entries':
+        return await createTimeEntriesTool(apiClient, args, config);
         
       case 'update_time_entry':
         return await updateTimeEntryTool(apiClient, args);

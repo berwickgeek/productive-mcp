@@ -119,6 +119,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   create_task_dependency: create('Create task dependency'),
   create_task_list: create('Create task list'),
   create_time_entry: create('Log time entry'),
+  create_time_entries: create('Log several time entries'),
   create_todo: create('Create todo'),
 
   // Additive or positional changes. Nothing is lost, and repeating them changes nothing.

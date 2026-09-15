@@ -284,3 +284,26 @@ describe('getTaskOverviewTool', () => {
     ).rejects.toThrow(/Invalid parameters/);
   });
 });
+
+describe('comments_only', () => {
+  it('drops the metadata and description on a re-read', async () => {
+    const client = makeClient({ comments: [makeComment('1', '<p>Fixed it</p>', '2026-08-02T09:00:00+10:00')] });
+
+    const full = (await getTaskOverviewTool(client, { task_id: '555' })).content[0].text;
+    const only = (await getTaskOverviewTool(client, { task_id: '555', comments_only: true })).content[0].text;
+
+    expect(full).toContain('Members report no renewal email.');
+    expect(only).not.toContain('Members report no renewal email.');
+    expect(only).not.toContain('ORIGINAL TASK');
+    expect(only.length).toBeLessThan(full.length);
+  });
+
+  it('still returns the comment thread', async () => {
+    const client = makeClient({ comments: [makeComment('1', '<p>Fixed it</p>', '2026-08-02T09:00:00+10:00')] });
+
+    const text = (await getTaskOverviewTool(client, { task_id: '555', comments_only: true })).content[0].text;
+
+    expect(text).toContain('Fixed it');
+    expect(text).toContain('TASK 555');
+  });
+});

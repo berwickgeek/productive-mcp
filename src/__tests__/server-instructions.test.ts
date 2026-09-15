@@ -62,7 +62,11 @@ describe('buildInstructions', () => {
     const text = buildInstructions(undefined);
 
     expect(text).toContain('PRODUCTIVE_USER_ID');
-    expect(text).not.toContain('assignee_id');
+    // The guard is on the "me" guidance itself. Asserting on the bare token `assignee_id`
+    // would also fire on unrelated routing advice that happens to name the argument.
+    expect(text).not.toContain('Pass the literal string "me"');
+    expect(text).not.toContain('acting as the user with ID');
+    expect(text).not.toContain('(as assignee_id)');
   });
 });
 

@@ -213,6 +213,7 @@ export class ProductiveAPIClient {
   }
   
   async listTasks(params?: {
+    task_ids?: string[];
     project_id?: string;
     assignee_id?: string;
     parent_task_id?: string;
@@ -227,6 +228,12 @@ export class ProductiveAPIClient {
 
     // Include assignee and workflow status so we can resolve names
     queryParams.append('include', 'assignee,workflow_status');
+
+    // A comma-separated id filter fetches many tasks in one request. Without it the only way
+    // to look up a known set of ids is one getTask per id.
+    if (params?.task_ids?.length) {
+      queryParams.append('filter[id]', params.task_ids.join(','));
+    }
 
     if (params?.project_id) {
       queryParams.append('filter[project_id]', params.project_id);
@@ -733,6 +740,7 @@ export class ProductiveAPIClient {
    */
   async listServices(params?: {
     company_id?: string;
+    project_id?: string;
     limit?: number;
     page?: number;
   }): Promise<ProductiveResponse<ProductiveService>> {
@@ -740,6 +748,10 @@ export class ProductiveAPIClient {
     
     if (params?.company_id) {
       queryParams.append('filter[company_id]', params.company_id);
+    }
+    
+    if (params?.project_id) {
+      queryParams.append('filter[project_id]', params.project_id);
     }
     
     if (params?.limit) {

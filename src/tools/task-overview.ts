@@ -27,6 +27,7 @@ interface AttachmentEntry {
 const getTaskOverviewSchema = z.object({
   task_id: z.string().min(1, 'Task ID is required'),
   comment_limit: z.number().min(1).max(50).default(10).optional(),
+  comments_only: z.boolean().optional().describe('Skip the metadata and description, returning only the comment thread'),
 });
 
 const TASK_INCLUDES = 'assignee,creator,workflow_status,project,task_list,attachments';
@@ -230,23 +231,31 @@ export async function getTaskOverviewTool(
 
     const task = taskResponse.data;
     const attachmentIndex: AttachmentEntry[] = [];
+    const sections: string[] = [];
 
-    const sections: string[] = [buildHeader(task, taskResponse.included)];
+    // Re-reading a task to see what changed was measured at 94 calls across 37 task/session
+    // pairs, re-sending 203,804 characters of description and already-seen comments. The
+    // second read only ever wanted the thread.
+    if (params.comments_only) {
+      sections.push(`TASK ${task.id}: ${task.attributes.title} (comments only)`);
+    } else {
+      sections.push(buildHeader(task, taskResponse.included));
 
-    const description = renderBody(task.attributes.description);
-    sections.push(`ORIGINAL TASK\n${description || '(no description)'}`);
+      const description = renderBody(task.attributes.description);
+      sections.push(`ORIGINAL TASK\n${description || '(no description)'}`);
 
-    const taskAttachments = collectAttachments(
-      task.relationships,
-      taskResponse.included,
-      'the task itself',
-      attachmentIndex
-    );
-    if (taskAttachments.length > 0) {
-      sections.push(
-        `Attachments on the task (${taskAttachments.length}):\n` +
-          taskAttachments.map((e) => formatAttachmentLine(e, '')).join('\n')
+      const taskAttachments = collectAttachments(
+        task.relationships,
+        taskResponse.included,
+        'the task itself',
+        attachmentIndex
       );
+      if (taskAttachments.length > 0) {
+        sections.push(
+          `Attachments on the task (${taskAttachments.length}):\n` +
+            taskAttachments.map((e) => formatAttachmentLine(e, '')).join('\n')
+        );
+      }
     }
 
     // The API returns newest first; reverse so the thread reads in order.
@@ -291,6 +300,11 @@ export const getTaskOverviewDefinition = {
       task_id: {
         type: 'string',
         description: 'The ID of the task to summarise (required)',
+      },
+      comments_only: {
+        type: 'boolean',
+        description: 'Return only the comment thread, skipping the metadata and the full description. Use this when re-reading a task you have already read in this session, for example to see the state after posting a comment.',
+        default: false,
       },
       comment_limit: {
         type: 'number',

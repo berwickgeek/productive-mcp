@@ -120,6 +120,41 @@ describe('listWorkflowStatuses request', () => {
 });
 
 /**
+ * These parameters exist to collapse call loops measured in real sessions: one request for a
+ * known set of task IDs instead of one getTask each, and a service list actually scoped to a
+ * project instead of an arbitrary page of every service in the organisation.
+ */
+describe('batch and filter parameters', () => {
+  it('sends several task ids as one comma-separated id filter', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listTasks({ task_ids: ['1000001', '1000002', '1000003'] });
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/tasks');
+    expect(url.searchParams.get('filter[id]')).toBe('1000001,1000002,1000003');
+  });
+
+  it('omits the id filter when no ids were given', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listTasks({ project_id: '400001' });
+
+    expect(urlOf(spy).searchParams.has('filter[id]')).toBe(false);
+  });
+
+  it('scopes services to a project', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listServices({ project_id: '400001' });
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/services');
+    expect(url.searchParams.get('filter[project_id]')).toBe('400001');
+  });
+});
+
+/**
  * Productive renamed the board concept to folder. Every request below was verified against the
  * live API on 2026-09-15: the board-named form is rejected (400 unsupported_filter on the
  * filter, 422 "folder can't be blank" on the bodies), the folder-named form is accepted.
@@ -128,11 +163,11 @@ describe('the board-to-folder rename', () => {
   it('filters task lists by folder_id, not board_id', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).listTaskLists({ folder_id: '576568' });
+    await new ProductiveAPIClient(config).listTaskLists({ folder_id: '900001' });
 
     const url = urlOf(spy);
     expect(url.pathname).toBe('/task_lists');
-    expect(url.searchParams.get('filter[folder_id]')).toBe('576568');
+    expect(url.searchParams.get('filter[folder_id]')).toBe('900001');
     expect(url.searchParams.has('filter[board_id]')).toBe(false);
   });
 
@@ -147,10 +182,10 @@ describe('the board-to-folder rename', () => {
   it('sideloads the folder on a single task list too', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).getTaskList('1254639');
+    await new ProductiveAPIClient(config).getTaskList('2000001');
 
     const url = urlOf(spy);
-    expect(url.pathname).toBe('/task_lists/1254639');
+    expect(url.pathname).toBe('/task_lists/2000001');
     expect(url.searchParams.get('include')).toBe('folder');
   });
 
@@ -161,30 +196,30 @@ describe('the board-to-folder rename', () => {
       name: 'Sprint 2',
       template_id: '1',
       project_id: '2',
-      folder_id: '576568',
+      folder_id: '900001',
     });
 
     const body = JSON.parse(spy.mock.calls[0][1].body as string);
-    expect(body.data.attributes.folder_id).toBe('576568');
+    expect(body.data.attributes.folder_id).toBe('900001');
     expect(body.data.attributes.board_id).toBeUndefined();
   });
 
   it('sends folder_id when moving a task list', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).moveTaskList('1254639', '576568');
+    await new ProductiveAPIClient(config).moveTaskList('2000001', '900001');
 
     const url = urlOf(spy);
-    expect(url.pathname).toBe('/task_lists/1254639/move');
+    expect(url.pathname).toBe('/task_lists/2000001/move');
     const body = JSON.parse(spy.mock.calls[0][1].body as string);
-    expect(body.data.attributes.folder_id).toBe('576568');
+    expect(body.data.attributes.folder_id).toBe('900001');
     expect(body.data.attributes.board_id).toBeUndefined();
   });
 
   it('lists boards from the folders collection', async () => {
     const spy = stubFetch();
 
-    await new ProductiveAPIClient(config).listBoards({ project_id: '813033' });
+    await new ProductiveAPIClient(config).listBoards({ project_id: '400001' });
 
     expect(urlOf(spy).pathname).toBe('/folders');
   });

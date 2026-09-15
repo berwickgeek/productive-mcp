@@ -25,14 +25,14 @@ describe('create_task_list', () => {
     });
 
     await createTaskList(mockClient({ createTaskList: createTaskListSpy }), {
-      board_id: '576568',
-      project_id: '813033',
+      board_id: '900001',
+      project_id: '400001',
       name: 'Sprint 1',
     });
 
     const body = createTaskListSpy.mock.calls[0][0];
     expect(body.data.relationships.folder).toEqual({
-      data: { id: '576568', type: 'folders' },
+      data: { id: '900001', type: 'folders' },
     });
     expect(body.data.relationships.board).toBeUndefined();
   });
@@ -42,25 +42,25 @@ describe('list_task_lists', () => {
   it('passes board_id through as the folder_id filter', async () => {
     const listTaskListsSpy = vi.fn().mockResolvedValue({ data: [] });
 
-    await listTaskLists(mockClient({ listTaskLists: listTaskListsSpy }), { board_id: '576568' });
+    await listTaskLists(mockClient({ listTaskLists: listTaskListsSpy }), { board_id: '900001' });
 
-    expect(listTaskListsSpy).toHaveBeenCalledWith({ folder_id: '576568', limit: 30 });
+    expect(listTaskListsSpy).toHaveBeenCalledWith({ folder_id: '900001', limit: 30 });
   });
 
   it('reads the board id off the folder relationship', async () => {
     const listTaskListsSpy = vi.fn().mockResolvedValue({
       data: [
         {
-          id: '1254639',
+          id: '2000001',
           attributes: { name: 'New list' },
-          relationships: { folder: { data: { id: '576568', type: 'folders' } } },
+          relationships: { folder: { data: { id: '900001', type: 'folders' } } },
         },
       ],
     });
 
     const result = await listTaskLists(mockClient({ listTaskLists: listTaskListsSpy }), {});
 
-    expect(result.content[0].text).toContain('Board ID: 576568');
+    expect(result.content[0].text).toContain('Board ID: 900001');
   });
 });
 
@@ -72,7 +72,7 @@ describe('create_task', () => {
 
     await createTaskTool(mockClient({ createTask: createTaskSpy }), {
       title: 'Probe',
-      board_id: '576568',
+      board_id: '900001',
       task_list_id: '2753083',
     });
 
