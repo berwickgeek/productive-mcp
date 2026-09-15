@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { ProductiveAPIClient } from '../api/client.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { toMcpError } from '../utils/errors.js';
-import { ProductiveTimeEntryCreate } from '../api/types.js';
+import { confirmField, confirmProperty, deletionPreview, excerpt } from '../utils/confirm.js';
+import { ProductiveTimeEntryCreate, ProductiveTimeEntryUpdate } from '../api/types.js';
 
 // Helper function to parse time input into minutes
 function parseTimeToMinutes(timeInput: string): number {
@@ -82,6 +83,20 @@ const createTimeEntrySchema = z.object({
   note: z.string().min(10, 'Work description must be at least 10 characters').describe('REQUIRED: Detailed description of work performed - be specific about what was accomplished, including bullet points if multiple items'),
   billable_time: z.string().optional(),
   confirm: z.boolean().optional().default(false),
+});
+
+const updateTimeEntrySchema = z.object({
+  time_entry_id: z.string().min(1, 'Time entry ID is required'),
+  time: z.string().optional(),
+  note: z.string().min(10, 'Work description must be at least 10 characters').optional(),
+  date: z.string().optional(),
+  service_id: z.string().optional(),
+  billable_time: z.string().optional(),
+});
+
+const deleteTimeEntrySchema = z.object({
+  time_entry_id: z.string().min(1, 'Time entry ID is required'),
+  confirm: confirmField,
 });
 
 const listServicesSchema = z.object({
@@ -358,6 +373,163 @@ ID: ${response.data.id}`;
   }
 }
 
+// Run a parse helper, reporting a rejected format as the caller's fault rather than ours.
+function asInvalidParams<T>(parse: () => T): T {
+  try {
+    return parse();
+  } catch (error) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      error instanceof Error ? error.message : 'Invalid value'
+    );
+  }
+}
+
+// Helper function to render a minute count as "2h 30m"
+function formatMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0) {
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+  return `${mins}m`;
+}
+
+export async function updateTimeEntryTool(
+  client: ProductiveAPIClient,
+  args: unknown
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  try {
+    const params = updateTimeEntrySchema.parse(args);
+
+    const supplied = [params.time, params.note, params.date, params.service_id, params.billable_time];
+    if (supplied.every(value => value === undefined)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Nothing to update - supply at least one of time, note, date, service_id or billable_time'
+      );
+    }
+
+    // parseDate and parseTimeToMinutes throw a plain Error, which toMcpError would read as a
+    // server fault. A rejected format is the caller's argument, so say so.
+    const parsedDate = params.date !== undefined
+      ? asInvalidParams(() => parseDate(params.date as string))
+      : undefined;
+    const timeInMinutes = params.time !== undefined
+      ? asInvalidParams(() => parseTimeToMinutes(params.time as string))
+      : undefined;
+
+    // Mirror create_time_entry: billable time tracks time unless the caller says otherwise.
+    // Without this, a consolidated entry keeps its old billable minutes and under-bills.
+    const billableTimeInMinutes = params.billable_time !== undefined
+      ? asInvalidParams(() => parseTimeToMinutes(params.billable_time as string))
+      : timeInMinutes;
+
+    const updateData: ProductiveTimeEntryUpdate = {
+      data: {
+        type: 'time_entries',
+        id: params.time_entry_id,
+        attributes: {
+          ...(parsedDate !== undefined && { date: parsedDate }),
+          ...(timeInMinutes !== undefined && { time: timeInMinutes }),
+          ...(billableTimeInMinutes !== undefined && { billable_time: billableTimeInMinutes }),
+          ...(params.note !== undefined && { note: params.note }),
+        },
+      },
+    };
+
+    if (params.service_id !== undefined) {
+      updateData.data.relationships = {
+        service: {
+          data: {
+            id: params.service_id,
+            type: 'services',
+          },
+        },
+      };
+    }
+
+    const response = await client.updateTimeEntry(params.time_entry_id, updateData);
+
+    let text = `Time entry ${response.data.id} updated successfully.
+Date: ${response.data.attributes.date}
+Time: ${formatMinutes(response.data.attributes.time)}`;
+
+    if (response.data.attributes.billable_time !== undefined) {
+      text += `
+Billable Time: ${formatMinutes(response.data.attributes.billable_time)}`;
+    }
+
+    if (response.data.attributes.note) {
+      text += `
+Note: ${response.data.attributes.note}`;
+    }
+
+    if (response.data.relationships?.service?.data?.id) {
+      text += `
+Service ID: ${response.data.relationships.service.data.id}`;
+    }
+
+    if (response.data.relationships?.task?.data?.id) {
+      text += `
+Task ID: ${response.data.relationships.task.data.id}`;
+    }
+
+    return {
+      content: [{
+        type: 'text',
+        text,
+      }],
+    };
+  } catch (error) {
+    // A 422 here is a data problem (a locked timesheet period, or a service not in an open
+    // budget) and becomes InvalidParams, along with 400 and 404. See utils/errors.ts.
+    throw toMcpError(error);
+  }
+}
+
+export async function deleteTimeEntryTool(
+  client: ProductiveAPIClient,
+  args: unknown
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  try {
+    const params = deleteTimeEntrySchema.parse(args);
+
+    if (!params.confirm) {
+      // Fetching first means a wrong ID fails here, before a billing record is destroyed.
+      const { data: record } = await client.getTimeEntry(params.time_entry_id);
+      return deletionPreview({
+        tool: 'delete_time_entry',
+        kind: 'time entry',
+        id: params.time_entry_id,
+        details: [
+          `Date: ${record.attributes.date}`,
+          `Time: ${formatMinutes(record.attributes.time)}`,
+          record.attributes.billable_time !== undefined
+            ? `Billable: ${formatMinutes(record.attributes.billable_time)}`
+            : undefined,
+          `Note: ${excerpt(record.attributes.note) ?? '(no note)'}`,
+          `Person ID: ${record.relationships?.person?.data?.id ?? 'Unknown'}`,
+          record.relationships?.task?.data?.id
+            ? `Task ID: ${record.relationships.task.data.id}`
+            : undefined,
+        ],
+      });
+    }
+
+    await client.deleteTimeEntry(params.time_entry_id);
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Time entry ${params.time_entry_id} deleted. The billing record is gone and this server has no way to restore it.`,
+      }],
+    };
+  } catch (error) {
+    throw toMcpError(error);
+  }
+}
+
 export async function listServicesTool(
   client: ProductiveAPIClient,
   args: unknown
@@ -536,6 +708,58 @@ export const createTimeEntryDefinition = {
       },
     },
     required: ['date', 'time', 'person_id', 'service_id', 'note'],
+  },
+};
+
+export const updateTimeEntryDefinition = {
+  name: 'update_time_entry',
+  description: 'Amend an existing time entry in Productive.io. The motivating case is consolidation: list the entries on a task for one date with list_time_entries, patch one with the summed minutes and a rewritten note, then remove the rest with delete_time_entry. Only the fields you supply are changed. "time" is a replacement, not an increment, so pass the new total. Supplying "time" without "billable_time" sets billable time to match, mirroring create_time_entry. This tool cannot move an entry to a different task: delete it and log a new one instead.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      time_entry_id: {
+        type: 'string',
+        description: 'The ID of the time entry to update (required)',
+      },
+      time: {
+        type: 'string',
+        description: 'New duration, replacing the existing one. Accepts formats like "2h", "120m", "2.5h", or "2.5" (assumed hours). A replacement, not an increment, so pass the new total.',
+      },
+      note: {
+        type: 'string',
+        description: 'New description of the work performed, replacing the existing note (minimum 10 characters)',
+        minLength: 10,
+      },
+      date: {
+        type: 'string',
+        description: 'New date. Accepts "today", "yesterday", or YYYY-MM-DD format',
+      },
+      service_id: {
+        type: 'string',
+        description: 'New service to book the entry against',
+      },
+      billable_time: {
+        type: 'string',
+        description: 'New billable duration, same format as time. Defaults to the new time value whenever time is supplied.',
+      },
+    },
+    required: ['time_entry_id'],
+  },
+};
+
+export const deleteTimeEntryDefinition = {
+  name: 'delete_time_entry',
+  description: 'Permanently delete a time entry in Productive.io. This removes a billing record and cannot be undone. Use it only for a duplicate or plainly erroneous entry, for example a second entry logged against a task that already has one for the same day. Do not use it to tidy entries that are merely untidy, and do not delete an entry you did not create. To change an entry rather than remove it, use update_time_entry. Requires confirmation: the first call only reports what would be deleted, and nothing is removed until you call again with "confirm": true.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      time_entry_id: {
+        type: 'string',
+        description: 'The ID of the time entry to delete (required). Find it with list_time_entries.',
+      },
+      confirm: confirmProperty,
+    },
+    required: ['time_entry_id'],
   },
 };
 

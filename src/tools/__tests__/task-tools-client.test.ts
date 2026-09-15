@@ -48,7 +48,7 @@ describe('getTaskTool', () => {
   it('fetches through the client with the relationships it later reads', async () => {
     const getTask = vi.fn().mockResolvedValue({
       data: {
-        id: '19300600',
+        id: '1000001',
         type: 'tasks',
         attributes: { title: 'Suspended members getting emails/notices', closed: false, created_at: '2026-07-31T01:52:54Z', updated_at: '2026-08-13T08:53:15Z' },
         relationships: {},
@@ -56,9 +56,9 @@ describe('getTaskTool', () => {
       included: [],
     });
 
-    const result = await getTaskTool(mockClient({ getTask }), { task_id: '19300600' });
+    const result = await getTaskTool(mockClient({ getTask }), { task_id: '1000001' });
 
-    expect(getTask).toHaveBeenCalledWith('19300600', 'task_list,assignee,workflow_status,attachments');
+    expect(getTask).toHaveBeenCalledWith('1000001', 'task_list,assignee,workflow_status,attachments');
     expect(result.content[0].text).toContain('Suspended members getting emails/notices');
   });
 
@@ -67,7 +67,7 @@ describe('getTaskTool', () => {
 
     let caught: any;
     try {
-      await getTaskTool(client, { task_id: '19300600' });
+      await getTaskTool(client, { task_id: '1000001' });
     } catch (err) {
       caught = err;
     }
@@ -86,21 +86,21 @@ describe('listSubtasksTool', () => {
     });
 
     const result = await listSubtasksTool(mockClient({ listTasks }), {
-      parent_task_id: '19300600',
+      parent_task_id: '1000001',
       limit: 5,
       page: 2,
     });
 
-    expect(listTasks).toHaveBeenCalledWith({ parent_task_id: '19300600', limit: 5, page: 2 });
+    expect(listTasks).toHaveBeenCalledWith({ parent_task_id: '1000001', limit: 5, page: 2 });
     expect(result.content[0].text).toContain('Child task');
   });
 
   it('defaults limit to 30 and page to 1', async () => {
     const listTasks = vi.fn().mockResolvedValue({ data: [] });
 
-    await listSubtasksTool(mockClient({ listTasks }), { parent_task_id: '19300600' });
+    await listSubtasksTool(mockClient({ listTasks }), { parent_task_id: '1000001' });
 
-    expect(listTasks).toHaveBeenCalledWith({ parent_task_id: '19300600', limit: 30, page: 1 });
+    expect(listTasks).toHaveBeenCalledWith({ parent_task_id: '1000001', limit: 30, page: 1 });
   });
 
   it('surfaces the JSON:API diagnostics on failure', async () => {
@@ -108,7 +108,7 @@ describe('listSubtasksTool', () => {
 
     let caught: any;
     try {
-      await listSubtasksTool(client, { parent_task_id: '19300600' });
+      await listSubtasksTool(client, { parent_task_id: '1000001' });
     } catch (err) {
       caught = err;
     }
@@ -122,10 +122,10 @@ describe('updateTaskStatusTool', () => {
   function statusResolvingClient() {
     return {
       getTask: vi.fn().mockResolvedValue({
-        data: { id: '19300600', relationships: { project: { data: { id: '813033', type: 'projects' } } } },
+        data: { id: '1000001', relationships: { project: { data: { id: '400001', type: 'projects' } } } },
       }),
       getProject: vi.fn().mockResolvedValue({
-        data: { id: '813033', relationships: { workflow: { data: { id: '77', type: 'workflows' } } } },
+        data: { id: '400001', relationships: { workflow: { data: { id: '77', type: 'workflows' } } } },
       }),
       listWorkflowStatuses: vi.fn().mockResolvedValue({
         data: [
@@ -134,7 +134,7 @@ describe('updateTaskStatusTool', () => {
         ],
       }),
       updateTask: vi.fn().mockResolvedValue({
-        data: { id: '19300600', attributes: { title: 'Suspended members getting emails/notices', closed: false } },
+        data: { id: '1000001', attributes: { title: 'Suspended members getting emails/notices', closed: false } },
       }),
     };
   }
@@ -143,15 +143,15 @@ describe('updateTaskStatusTool', () => {
     const c = statusResolvingClient();
 
     const result = await updateTaskStatusTool(mockClient(c), {
-      task_id: '19300600',
+      task_id: '1000001',
       status_name: 'in progress',
     });
 
-    expect(c.getTask).toHaveBeenCalledWith('19300600', 'project');
-    expect(c.getProject).toHaveBeenCalledWith('813033', 'workflow');
+    expect(c.getTask).toHaveBeenCalledWith('1000001', 'project');
+    expect(c.getProject).toHaveBeenCalledWith('400001', 'workflow');
     expect(c.listWorkflowStatuses).toHaveBeenCalledWith({ workflow_id: '77', limit: 200 });
     expect(c.updateTask).toHaveBeenCalledWith(
-      '19300600',
+      '1000001',
       expect.objectContaining({
         data: expect.objectContaining({
           relationships: { workflow_status: { data: { id: '901', type: 'workflow_statuses' } } },
@@ -164,7 +164,7 @@ describe('updateTaskStatusTool', () => {
   it('skips resolution entirely when a workflow_status_id is given', async () => {
     const c = statusResolvingClient();
 
-    await updateTaskStatusTool(mockClient(c), { task_id: '19300600', workflow_status_id: '902' });
+    await updateTaskStatusTool(mockClient(c), { task_id: '1000001', workflow_status_id: '902' });
 
     expect(c.getTask).not.toHaveBeenCalled();
     expect(c.updateTask).toHaveBeenCalled();
@@ -175,7 +175,7 @@ describe('updateTaskStatusTool', () => {
 
     let caught: any;
     try {
-      await updateTaskStatusTool(mockClient(c), { task_id: '19300600', status_name: 'Done' });
+      await updateTaskStatusTool(mockClient(c), { task_id: '1000001', status_name: 'Done' });
     } catch (err) {
       caught = err;
     }
@@ -211,7 +211,7 @@ describe('error codes at the tool boundary', () => {
     ]);
     const err = await codeOf(() =>
       updateTaskStatusTool(mockClient({ updateTask: vi.fn().mockRejectedValue(rejected) }), {
-        task_id: '19300600',
+        task_id: '1000001',
         workflow_status_id: '999',
       })
     );
@@ -230,7 +230,7 @@ describe('error codes at the tool boundary', () => {
 
   it('keeps update_task_status\'s own argument check as InvalidParams', async () => {
     const err = await codeOf(() =>
-      updateTaskStatusTool(mockClient({}), { task_id: '19300600' })
+      updateTaskStatusTool(mockClient({}), { task_id: '1000001' })
     );
 
     expect(err.code).toBe(ErrorCode.InvalidParams);
@@ -250,11 +250,9 @@ describe('tool layer', () => {
   });
 
   it('never maps errors inline, so a caller fault is never reported as a server fault', () => {
-    // task-reposition.ts returns its errors as plain text instead of throwing, a separate
-    // known bug. It is excluded here so this guard stays about error *codes*.
     const toolsDir = fileURLToPath(new URL('..', import.meta.url));
     const offenders = readdirSync(toolsDir)
-      .filter(f => f.endsWith('.ts') && f !== 'task-reposition.ts')
+      .filter(f => f.endsWith('.ts'))
       .filter(f => readFileSync(join(toolsDir, f), 'utf8').includes('ErrorCode.InternalError'));
 
     expect(offenders).toEqual([]);

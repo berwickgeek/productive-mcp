@@ -36,17 +36,17 @@ describe('extractMentionTokens', () => {
   });
 
   it('extracts a single full name mention', () => {
-    const tokens = extractMentionTokens('Hey @Jarrod Lawson, check this');
+    const tokens = extractMentionTokens('Hey @Alex Morgan, check this');
     expect(tokens).toHaveLength(1);
-    expect(tokens[0].raw).toBe('@Jarrod Lawson');
-    expect(tokens[0].name).toBe('Jarrod Lawson');
+    expect(tokens[0].raw).toBe('@Alex Morgan');
+    expect(tokens[0].name).toBe('Alex Morgan');
   });
 
   it('extracts a first-name-only mention', () => {
-    const tokens = extractMentionTokens('Hey @Jarrod, check this');
+    const tokens = extractMentionTokens('Hey @Alex, check this');
     expect(tokens).toHaveLength(1);
-    expect(tokens[0].raw).toBe('@Jarrod');
-    expect(tokens[0].name).toBe('Jarrod');
+    expect(tokens[0].raw).toBe('@Alex');
+    expect(tokens[0].name).toBe('Alex');
   });
 
   it('extracts multiple mentions', () => {
@@ -69,13 +69,13 @@ describe('extractMentionTokens', () => {
   });
 
   it('extracts mention inside HTML', () => {
-    const tokens = extractMentionTokens('<p>Hey @Jarrod Lawson</p>');
+    const tokens = extractMentionTokens('<p>Hey @Alex Morgan</p>');
     expect(tokens).toHaveLength(1);
-    expect(tokens[0].name).toBe('Jarrod Lawson');
+    expect(tokens[0].name).toBe('Alex Morgan');
   });
 
   it('does not match already-resolved @[{...}] patterns', () => {
-    const resolved = '@[{"type":"person","id":"123","label":"Jarrod Lawson"}]';
+    const resolved = '@[{"type":"person","id":"123","label":"Alex Morgan"}]';
     const tokens = extractMentionTokens(resolved);
     expect(tokens).toHaveLength(0);
   });
@@ -99,13 +99,13 @@ describe('extractMentionTokens', () => {
 
 describe('buildMentionReplacement', () => {
   it('builds correct JSON mention format', () => {
-    const person = makePerson('698785', 'Jarrod', 'Lawson', 'https://example.com/avatar.png');
+    const person = makePerson('300001', 'Alex', 'Morgan', 'https://example.com/avatar.png');
     const result = buildMentionReplacement(person);
     const parsed = JSON.parse(result.slice(2, -1)); // strip @[ and ]
 
     expect(parsed.type).toBe('person');
-    expect(parsed.id).toBe('698785');
-    expect(parsed.label).toBe('Jarrod Lawson');
+    expect(parsed.id).toBe('300001');
+    expect(parsed.label).toBe('Alex Morgan');
     expect(parsed.avatar_url).toBe('https://example.com/avatar.png');
     expect(parsed.attachment_url).toBeNull();
     expect(parsed.is_done).toBe(false);
@@ -144,27 +144,27 @@ describe('resolveMentions', () => {
   });
 
   it('resolves a single exact full name match', async () => {
-    const jarrod = makePerson('698785', 'Jarrod', 'Lawson');
-    const client = mockClient([jarrod]);
+    const alex = makePerson('300001', 'Alex', 'Morgan');
+    const client = mockClient([alex]);
 
-    const result = await resolveMentions('Hey @Jarrod Lawson, check this', client);
+    const result = await resolveMentions('Hey @Alex Morgan, check this', client);
 
     expect(result.resolved).toHaveLength(1);
-    expect(result.resolved[0].person.id).toBe('698785');
+    expect(result.resolved[0].person.id).toBe('300001');
     expect(result.unresolved).toHaveLength(0);
     expect(result.ambiguous).toHaveLength(0);
     expect(result.resolvedBody).toContain('@[{');
-    expect(result.resolvedBody).not.toContain('@Jarrod Lawson');
+    expect(result.resolvedBody).not.toContain('@Alex Morgan');
   });
 
   it('resolves a unique first-name-only match', async () => {
-    const jarrod = makePerson('698785', 'Jarrod', 'Lawson');
-    const client = mockClient([jarrod]);
+    const alex = makePerson('300001', 'Alex', 'Morgan');
+    const client = mockClient([alex]);
 
-    const result = await resolveMentions('Hey @Jarrod!', client);
+    const result = await resolveMentions('Hey @Alex!', client);
 
     expect(result.resolved).toHaveLength(1);
-    expect(result.resolved[0].person.id).toBe('698785');
+    expect(result.resolved[0].person.id).toBe('300001');
   });
 
   it('marks first-name-only as ambiguous when multiple matches', async () => {
@@ -182,8 +182,8 @@ describe('resolveMentions', () => {
   });
 
   it('marks unmatched mentions as unresolved', async () => {
-    const jarrod = makePerson('698785', 'Jarrod', 'Lawson');
-    const client = mockClient([jarrod]);
+    const alex = makePerson('300001', 'Alex', 'Morgan');
+    const client = mockClient([alex]);
 
     const result = await resolveMentions('Hey @Nobody Special', client);
 
@@ -208,27 +208,27 @@ describe('resolveMentions', () => {
   });
 
   it('handles mix of resolved and unresolved mentions', async () => {
-    const jarrod = makePerson('698785', 'Jarrod', 'Lawson');
-    const client = mockClient([jarrod]);
+    const alex = makePerson('300001', 'Alex', 'Morgan');
+    const client = mockClient([alex]);
 
-    const result = await resolveMentions('@Jarrod Lawson and @Unknown Person', client);
+    const result = await resolveMentions('@Alex Morgan and @Unknown Person', client);
 
     expect(result.resolved).toHaveLength(1);
     expect(result.unresolved).toHaveLength(1);
-    expect(result.resolvedBody).not.toContain('@Jarrod Lawson');
+    expect(result.resolvedBody).not.toContain('@Alex Morgan');
     expect(result.resolvedBody).toContain('@Unknown Person');
   });
 
   it('does not rewrite anything when ambiguous matches exist', async () => {
     const jane1 = makePerson('1', 'Jane', 'Doe');
     const jane2 = makePerson('2', 'Jane', 'Smith');
-    const jarrod = makePerson('3', 'Jarrod', 'Lawson');
-    const client = mockClient([jane1, jane2, jarrod]);
+    const alex = makePerson('3', 'Alex', 'Morgan');
+    const client = mockClient([jane1, jane2, alex]);
 
-    const result = await resolveMentions('@Jane and @Jarrod Lawson', client);
+    const result = await resolveMentions('@Jane and @Alex Morgan', client);
 
     // Ambiguous @Jane prevents any rewriting
-    expect(result.resolvedBody).toBe('@Jane and @Jarrod Lawson');
+    expect(result.resolvedBody).toBe('@Jane and @Alex Morgan');
     expect(result.ambiguous).toHaveLength(1);
     expect(result.resolved).toHaveLength(0);
   });
@@ -254,46 +254,46 @@ describe('resolveMentions', () => {
   });
 
   it('handles mention inside HTML tags', async () => {
-    const jarrod = makePerson('698785', 'Jarrod', 'Lawson');
-    const client = mockClient([jarrod]);
+    const alex = makePerson('300001', 'Alex', 'Morgan');
+    const client = mockClient([alex]);
 
-    const result = await resolveMentions('<p>Hey @Jarrod Lawson</p>', client);
+    const result = await resolveMentions('<p>Hey @Alex Morgan</p>', client);
 
     expect(result.resolved).toHaveLength(1);
     expect(result.resolvedBody).toContain('<p>Hey ');
     expect(result.resolvedBody).toContain('</p>');
-    expect(result.resolvedBody).not.toContain('@Jarrod Lawson');
+    expect(result.resolvedBody).not.toContain('@Alex Morgan');
   });
 
   it('matches names case-insensitively against people list', async () => {
-    const jarrod = makePerson('698785', 'jarrod', 'lawson');
-    const client = mockClient([jarrod]);
+    const alex = makePerson('300001', 'alex', 'morgan');
+    const client = mockClient([alex]);
 
-    // Regex captures "Jarrod Lawson" (capitalised), matching against lowercase person data
-    const result = await resolveMentions('Hey @Jarrod Lawson', client);
+    // Regex captures "Alex Morgan" (capitalised), matching against lowercase person data
+    const result = await resolveMentions('Hey @Alex Morgan', client);
 
     expect(result.resolved).toHaveLength(1);
-    expect(result.resolved[0].person.id).toBe('698785');
+    expect(result.resolved[0].person.id).toBe('300001');
   });
 });
 
 describe('renderStoredMentions', () => {
   it('renders a person blob as an @Label mention', () => {
     const body =
-      '<p>@[{"type":"person","id":"705374","label":"Julian Smith","avatar_url":null,"attachment_url":null,"is_done":false}] please review</p>';
-    expect(renderStoredMentions(body)).toBe('<p>@Julian Smith please review</p>');
+      '<p>@[{"type":"person","id":"300002","label":"Sam Taylor","avatar_url":null,"attachment_url":null,"is_done":false}] please review</p>';
+    expect(renderStoredMentions(body)).toBe('<p>@Sam Taylor please review</p>');
   });
 
   it('renders an inline attachment blob as a pointer carrying the attachment ID', () => {
     const body =
-      '<p>@[{"type":"inline_attachment","id":"9131629","label":"Screenshot.png","avatar_url":null,"attachment_url":"https://files.productive.io/x.png","is_done":false}]</p>';
-    expect(renderStoredMentions(body)).toBe('<p>[attachment 9131629: Screenshot.png]</p>');
+      '<p>@[{"type":"inline_attachment","id":"5000001","label":"Screenshot.png","avatar_url":null,"attachment_url":"https://files.productive.io/x.png","is_done":false}]</p>';
+    expect(renderStoredMentions(body)).toBe('<p>[attachment 5000001: Screenshot.png]</p>');
   });
 
   it('renders several blobs of mixed type in one body', () => {
     const body =
-      '@[{"type":"person","label":"Jay M"}] see @[{"type":"inline_attachment","id":"12","label":"err.png"}]';
-    expect(renderStoredMentions(body)).toBe('@Jay M see [attachment 12: err.png]');
+      '@[{"type":"person","label":"Pat M"}] see @[{"type":"inline_attachment","id":"12","label":"err.png"}]';
+    expect(renderStoredMentions(body)).toBe('@Pat M see [attachment 12: err.png]');
   });
 
   it('leaves an unparseable blob verbatim', () => {

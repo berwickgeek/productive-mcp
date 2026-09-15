@@ -560,6 +560,34 @@ export interface ProductiveTimeEntryCreate {
   };
 }
 
+/**
+ * Time entry update payload for a PATCH to time_entries/{id}.
+ *
+ * Every field is optional: only what is supplied is changed. There is deliberately no `task`
+ * relationship here, because an entry cannot be repointed at a different task through this
+ * endpoint.
+ */
+export interface ProductiveTimeEntryUpdate {
+  data: {
+    type: 'time_entries';
+    id: string;
+    attributes?: {
+      date?: string; // ISO date format (YYYY-MM-DD)
+      time?: number; // Time in minutes
+      billable_time?: number; // Billable time in minutes
+      note?: string; // Description of work performed
+    };
+    relationships?: {
+      service?: {
+        data: {
+          id: string;
+          type: 'services';
+        };
+      };
+    };
+  };
+}
+
 // ---- Folder types ----
 
 export interface ProductiveFolder {
