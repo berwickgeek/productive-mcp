@@ -119,6 +119,77 @@ describe('listWorkflowStatuses request', () => {
   });
 });
 
+/**
+ * Productive renamed the board concept to folder. Every request below was verified against the
+ * live API on 2026-09-15: the board-named form is rejected (400 unsupported_filter on the
+ * filter, 422 "folder can't be blank" on the bodies), the folder-named form is accepted.
+ */
+describe('the board-to-folder rename', () => {
+  it('filters task lists by folder_id, not board_id', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listTaskLists({ folder_id: '576568' });
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/task_lists');
+    expect(url.searchParams.get('filter[folder_id]')).toBe('576568');
+    expect(url.searchParams.has('filter[board_id]')).toBe(false);
+  });
+
+  it('sideloads the folder so the board id is actually present', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listTaskLists();
+
+    expect(urlOf(spy).searchParams.get('include')).toBe('folder');
+  });
+
+  it('sideloads the folder on a single task list too', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).getTaskList('1254639');
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/task_lists/1254639');
+    expect(url.searchParams.get('include')).toBe('folder');
+  });
+
+  it('sends folder_id when copying a task list', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).copyTaskList({
+      name: 'Sprint 2',
+      template_id: '1',
+      project_id: '2',
+      folder_id: '576568',
+    });
+
+    const body = JSON.parse(spy.mock.calls[0][1].body as string);
+    expect(body.data.attributes.folder_id).toBe('576568');
+    expect(body.data.attributes.board_id).toBeUndefined();
+  });
+
+  it('sends folder_id when moving a task list', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).moveTaskList('1254639', '576568');
+
+    const url = urlOf(spy);
+    expect(url.pathname).toBe('/task_lists/1254639/move');
+    const body = JSON.parse(spy.mock.calls[0][1].body as string);
+    expect(body.data.attributes.folder_id).toBe('576568');
+    expect(body.data.attributes.board_id).toBeUndefined();
+  });
+
+  it('lists boards from the folders collection', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).listBoards({ project_id: '813033' });
+
+    expect(urlOf(spy).pathname).toBe('/folders');
+  });
+});
+
 describe('updateTimeEntry request', () => {
   it('PATCHes the single entry with the payload it was given', async () => {
     const spy = stubFetch();

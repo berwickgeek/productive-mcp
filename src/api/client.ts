@@ -309,14 +309,16 @@ export class ProductiveAPIClient {
   }
   
   async listTaskLists(params?: {
-    board_id?: string;
+    folder_id?: string;
     limit?: number;
     page?: number;
   }): Promise<ProductiveResponse<ProductiveTaskList>> {
     const queryParams = new URLSearchParams();
     
-    if (params?.board_id) {
-      queryParams.append('filter[board_id]', params.board_id);
+    // Productive renamed the board concept to folder (see listBoards above). On task_lists
+    // `filter[board_id]` now returns 400 unsupported_filter, so the filter is `filter[folder_id]`.
+    if (params?.folder_id) {
+      queryParams.append('filter[folder_id]', params.folder_id);
     }
     
     if (params?.limit) {
@@ -327,6 +329,11 @@ export class ProductiveAPIClient {
       queryParams.append('page[number]', params.page.toString());
     }
     
+    // Without this include the folder relationship comes back as {"meta":{"included":false}},
+    // so the board id the caller prints is silently absent. include=board is the form the
+    // deprecation notice retires; it already sideloads nothing.
+    queryParams.append('include', 'folder');
+
     const queryString = queryParams.toString();
     const path = `task_lists${queryString ? `?${queryString}` : ''}`;
     
@@ -993,7 +1000,9 @@ export class ProductiveAPIClient {
   // ---- Task List extended methods ----
 
   async getTaskList(taskListId: string): Promise<ProductiveSingleResponse<ProductiveTaskList>> {
-    return this.makeRequest<ProductiveSingleResponse<ProductiveTaskList>>(`task_lists/${taskListId}`);
+    return this.makeRequest<ProductiveSingleResponse<ProductiveTaskList>>(
+      `task_lists/${taskListId}?include=folder`
+    );
   }
 
   async updateTaskList(taskListId: string, data: ProductiveTaskListUpdate): Promise<ProductiveSingleResponse<ProductiveTaskList>> {
@@ -1015,7 +1024,7 @@ export class ProductiveAPIClient {
     name: string;
     template_id: string;
     project_id: string;
-    board_id: string;
+    folder_id: string;
     copy_open_tasks?: boolean;
     copy_assignees?: boolean;
   }): Promise<ProductiveSingleResponse<ProductiveTaskList>> {
@@ -1028,7 +1037,8 @@ export class ProductiveAPIClient {
             name: params.name,
             template_id: params.template_id,
             project_id: params.project_id,
-            board_id: params.board_id,
+            // `board_id` here is rejected with 422 "folder can't be blank".
+            folder_id: params.folder_id,
             copy_open_tasks: params.copy_open_tasks,
             copy_assignees: params.copy_assignees,
           },
@@ -1037,11 +1047,11 @@ export class ProductiveAPIClient {
     });
   }
 
-  async moveTaskList(taskListId: string, boardId: string): Promise<void> {
+  async moveTaskList(taskListId: string, folderId: string): Promise<void> {
     return this.makeVoidRequest(`task_lists/${taskListId}/move`, {
       method: 'PATCH',
       body: JSON.stringify({
-        data: { type: 'task_lists', attributes: { board_id: boardId } },
+        data: { type: 'task_lists', attributes: { folder_id: folderId } },
       }),
     });
   }

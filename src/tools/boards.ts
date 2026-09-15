@@ -89,7 +89,7 @@ export async function createBoard(
     
     const boardData = {
       data: {
-        type: 'boards' as const,
+        type: 'folders' as const,
         attributes: {
           name: params.name,
           description: params.description,
