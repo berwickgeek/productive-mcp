@@ -47,7 +47,7 @@ export function extractMentionTokens(body: string): MentionToken[] {
 }
 
 /**
- * Matches a stored mention blob, e.g. `@[{"type":"person","label":"Jay M",...}]`.
+ * Matches a stored mention blob, e.g. `@[{"type":"person","label":"Pat M",...}]`.
  * Kept deliberately tolerant so a malformed blob is left alone rather than mangled.
  */
 const STORED_MENTION_REGEX = /@\[(\{[^\]]*\})\]/g;

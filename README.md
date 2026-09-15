@@ -199,7 +199,7 @@ Restart Claude Code after configuration.
 Use `get_task_overview` first. It answers "what is this issue about" in one call:
 
 ```
-get_task_overview(task_id: "19300600")
+get_task_overview(task_id: "1000001")
 ```
 
 It returns metadata (status, assignee, project, task list, dates, estimate vs worked time),
@@ -211,11 +211,11 @@ Attachments are surfaced two ways, because most of them are screenshots that car
 context you need:
 
 - **Inline**, at the exact point in the comment where the screenshot was posted, as
-  `[attachment 9131629: Screenshot_2026-07-31_110620.png]`.
+  `[attachment 5000001: Screenshot.png]`.
 - **Indexed**, in an `ATTACHMENTS` block at the end listing every attachment on the task and
   on the comments shown, flagged `[IMAGE]`, with the source comment and author.
 
-Then fetch only the ones that matter with `get_attachment(attachment_id: "9131629")`, which
+Then fetch only the ones that matter with `get_attachment(attachment_id: "5000001")`, which
 returns images inline.
 
 The older path (`get_task`, then `list_comments`, then a `get_comment` per truncated comment)
@@ -343,6 +343,8 @@ still works, but costs one round trip per comment and truncates bodies to 200 ch
 |------|-------------|
 | `list_time_entries` | List time entries. Filter by `date`, `after`, `before`, `person_id`, `project_id`, `task_id`, `service_id` |
 | `create_time_entry` | Create a time entry. Requires `date`, `time` (minutes), `person_id`, `service_id`. Optional `task_id`, `note` |
+| `update_time_entry` | Amend a time entry by `time_entry_id`. Optional `time`, `note`, `date`, `service_id`, `billable_time`. Only the fields supplied are changed |
+| `delete_time_entry` | Permanently delete a time entry by `time_entry_id`. Requires `confirm: true` on a second call |
 | `list_services` | List services. Filter by `company_id`, `limit` |
 | `get_project_services` | Get services for a project |
 | `list_project_deals` | List deals/budgets for a project |
@@ -363,7 +365,7 @@ You can update a task's status by name — no need to look up IDs:
 
 ```
 update_task_status {
-  "task_id": "12399194",
+  "task_id": "1000003",
   "status_name": "On Hold"
 }
 ```
@@ -376,11 +378,11 @@ If the name doesn't match or is ambiguous, it returns the available statuses for
 No workflow status matching "banana" found.
 
 Available statuses:
-  • "Pending" (ID: 102305) — Not Started
-  • "Open" (ID: 102291) — Started
-  • "On Hold" (ID: 102306) — Started
-  • "Waiting" (ID: 102307) — Started
-  • "Closed" (ID: 102292) — Closed
+  • "Pending" (ID: 100001) — Not Started
+  • "Open" (ID: 100002) — Started
+  • "On Hold" (ID: 100003) — Started
+  • "Waiting" (ID: 100004) — Started
+  • "Closed" (ID: 100005) — Closed
 ```
 
 You can also pass `workflow_status_id` directly if you already know the ID.

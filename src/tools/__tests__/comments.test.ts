@@ -132,7 +132,7 @@ describe('listCommentsTool - null comment bodies', () => {
     });
     const client = { listComments } as unknown as ProductiveAPIClient;
 
-    const result = await listCommentsTool(client, { task_id: '18263163' });
+    const result = await listCommentsTool(client, { task_id: '1000004' });
 
     const text = result.content[0].text;
     expect(text).toContain('Comments (2)');
@@ -153,35 +153,102 @@ describe('listCommentsTool - attachments', () => {
         updated_at: '2026-06-10T10:00:00Z',
       },
       relationships: {
-        attachments: { data: [{ id: '8779231', type: 'attachments' }] },
+        attachments: { data: [{ id: '5000002', type: 'attachments' }] },
       },
     };
     const listComments = vi.fn().mockResolvedValue({
       data: [comment],
       included: [
         {
-          id: '8779231',
+          id: '5000002',
           type: 'attachments',
           attributes: {
             name: 'image.png',
             content_type: 'image/png',
             size: 7035,
-            url: 'https://files.productive.io/attachments/files/008/779/231/original/image.png?1781846603',
+            url: 'https://files.productive.io/attachments/files/000/000/002/original/image.png?1',
           },
         },
       ],
     });
     const client = { listComments } as unknown as ProductiveAPIClient;
 
-    const result = await listCommentsTool(client, { task_id: '18263163' });
+    const result = await listCommentsTool(client, { task_id: '1000004' });
 
     const text = result.content[0].text;
     expect(text).toContain('Attachments (1)');
-    expect(text).toContain('ID 8779231');
+    expect(text).toContain('ID 5000002');
     expect(text).toContain('image.png');
     expect(text).toContain('image/png');
     expect(text).toContain('7035 bytes');
     expect(text).not.toContain('files.productive.io');
     expect(text).not.toContain('token');
+  });
+});
+
+describe('listCommentsTool - visibility, draft and edit flags', () => {
+  it('prints Hidden, Draft and Edited for a hidden draft that has been edited', async () => {
+    const comment: ProductiveComment = {
+      id: '2001',
+      type: 'comments',
+      attributes: {
+        body: 'Internal instruction',
+        commentable_type: 'task',
+        created_at: '2026-01-01T09:00:00Z',
+        updated_at: '2026-01-02T09:00:00Z',
+        edited_at: '2026-01-02T09:00:00Z',
+        hidden: true,
+        draft: true,
+      },
+    };
+    const listComments = vi.fn().mockResolvedValue({ data: [comment] });
+    const client = { listComments } as unknown as ProductiveAPIClient;
+
+    const result = await listCommentsTool(client, { task_id: '1001' });
+
+    const text = result.content[0].text;
+    expect(text).toContain('Hidden: true');
+    expect(text).toContain('Draft: true');
+    expect(text).toContain('Edited: 2026-01-02T09:00:00Z');
+  });
+
+  it('defaults Hidden and Draft to false and omits Edited when the comment was never edited', async () => {
+    const listComments = vi.fn().mockResolvedValue({
+      data: [makeListedComment('7', 'Visible note')],
+    });
+    const client = { listComments } as unknown as ProductiveAPIClient;
+
+    const result = await listCommentsTool(client, { task_id: '1001' });
+
+    const text = result.content[0].text;
+    expect(text).toContain('Hidden: false');
+    expect(text).toContain('Draft: false');
+    expect(text).not.toContain('Edited:');
+  });
+
+  it('prints Updated on every comment, including one updated with no edited_at', async () => {
+    const updatedOnly: ProductiveComment = {
+      id: '2002',
+      type: 'comments',
+      attributes: {
+        body: 'Changed text, no edited_at',
+        commentable_type: 'task',
+        created_at: '2026-01-01T09:00:00.000+02:00',
+        updated_at: '2026-01-01T09:15:30.123+02:00',
+        hidden: true,
+      },
+    };
+    const listComments = vi.fn().mockResolvedValue({
+      data: [makeListedComment('7', 'Visible note'), updatedOnly],
+    });
+    const client = { listComments } as unknown as ProductiveAPIClient;
+
+    const result = await listCommentsTool(client, { task_id: '1001' });
+
+    const text = result.content[0].text;
+    expect(text).toContain('Updated: 2026-06-10T10:00:00Z');
+    expect(text).toContain('Updated: 2026-01-01T09:15:30.123+02:00');
+    expect(text.match(/^ {2}Updated: /gm)).toHaveLength(2);
+    expect(text).not.toContain('Edited:');
   });
 });

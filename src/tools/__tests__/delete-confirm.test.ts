@@ -16,6 +16,7 @@ import { deleteCommentTool, deleteCommentDefinition } from '../comments.js';
 import { deletePageTool, deletePageDefinition } from '../pages.js';
 import { deleteTodoTool, deleteTodoDefinition } from '../todos.js';
 import { deleteTaskDependencyTool, deleteTaskDependencyDefinition } from '../task-dependencies.js';
+import { deleteTimeEntryTool, deleteTimeEntryDefinition } from '../time-entries.js';
 
 function mockClient(overrides: Record<string, unknown>): ProductiveAPIClient {
   return overrides as unknown as ProductiveAPIClient;
@@ -30,14 +31,14 @@ const CASES = [
     name: 'delete_task',
     tool: deleteTaskTool,
     definition: deleteTaskDefinition,
-    args: { task_id: '19300600' },
+    args: { task_id: '1000001' },
     getter: 'getTask',
     deleter: 'deleteTask',
     record: {
       data: {
-        id: '19300600',
+        id: '1000001',
         attributes: { title: 'Suspended members getting emails/notices', task_number: 407, closed: false },
-        relationships: { project: { data: { id: '813033' } } },
+        relationships: { project: { data: { id: '400001' } } },
       },
     },
     expectInPreview: 'Suspended members getting emails/notices',
@@ -46,14 +47,14 @@ const CASES = [
     name: 'delete_comment',
     tool: deleteCommentTool,
     definition: deleteCommentDefinition,
-    args: { comment_id: '16843014' },
+    args: { comment_id: '2000001' },
     getter: 'getComment',
     deleter: 'deleteComment',
     record: {
       data: {
-        id: '16843014',
+        id: '2000001',
         attributes: { body: '<p>Quick update on Cameron</p>', commentable_type: 'task', created_at: '2026-08-13' },
-        relationships: { task: { data: { id: '19300600' } } },
+        relationships: { task: { data: { id: '1000001' } } },
       },
     },
     expectInPreview: 'Quick update on Cameron',
@@ -93,6 +94,22 @@ const CASES = [
       },
     },
     expectInPreview: 'Dependent task ID: 2',
+  },
+  {
+    name: 'delete_time_entry',
+    tool: deleteTimeEntryTool,
+    definition: deleteTimeEntryDefinition,
+    args: { time_entry_id: '8000002' },
+    getter: 'getTimeEntry',
+    deleter: 'deleteTimeEntry',
+    record: {
+      data: {
+        id: '8000002',
+        attributes: { date: '2026-09-07', time: 90, billable_time: 90, note: 'Consolidated support work on the renewals form' },
+        relationships: { person: { data: { id: '300001' } }, task: { data: { id: '1000002' } } },
+      },
+    },
+    expectInPreview: 'Consolidated support work on the renewals form',
   },
 ] as const;
 
