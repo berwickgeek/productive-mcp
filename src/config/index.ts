@@ -23,6 +23,8 @@ const configSchema = z.object({
     .string()
     .min(1)
     .default(path.join(os.tmpdir(), 'productive-mcp-attachments')),
+  /** IANA zone every returned timestamp is shown in. Productive itself returns the org's offset. */
+  PRODUCTIVE_DISPLAY_TZ: z.string().min(1).default('Australia/Brisbane'),
 });
 
 export type Config = z.infer<typeof configSchema>;

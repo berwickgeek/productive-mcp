@@ -1,4 +1,5 @@
 import { Config } from '../config/index.js';
+import { localizeTimestamps } from '../utils/timezone.js';
 import {
   ProductiveCompany,
   ProductiveProject,
@@ -125,7 +126,7 @@ export class ProductiveAPIClient {
         );
       }
 
-      return await response.json() as T;
+      return localizeTimestamps(await response.json(), this.config.PRODUCTIVE_DISPLAY_TZ ?? 'Australia/Brisbane') as T;
     } catch (error) {
       if (error instanceof Error) {
         throw error;
@@ -945,7 +946,7 @@ export class ProductiveAPIClient {
       
       // For any other success response with content, try to parse JSON
       try {
-        return await response.json();
+        return localizeTimestamps(await response.json(), this.config.PRODUCTIVE_DISPLAY_TZ ?? 'Australia/Brisbane');
       } catch (e) {
         // If parsing fails but status was success, return a minimal success object
         return {
