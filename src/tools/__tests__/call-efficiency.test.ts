@@ -9,6 +9,24 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+
+// get_attachment reads the cache dir from config and writes there. Without these mocks the
+// batching tests need real credentials (CI has none) and leave files in the real cache.
+vi.mock('fs', () => ({
+  promises: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+vi.mock('../../config/index.js', () => ({
+  getConfig: () => ({
+    PRODUCTIVE_API_TOKEN: 'secret-token',
+    PRODUCTIVE_ORG_ID: '1',
+    PRODUCTIVE_API_BASE_URL: 'https://api.test/',
+    PRODUCTIVE_ATTACHMENT_DIR: '/cache',
+  }),
+}));
+
 import { ProductiveAPIClient } from '../../api/client.js';
 import { listTasksTool } from '../tasks.js';
 import { addTaskCommentTool } from '../comments.js';
