@@ -18,6 +18,37 @@ Per the Productive docs (https://developer.productive.io/working_with_attachment
 - `temp_url` is an internal storage path, not a presigned S3 URL: 403. Do not use it.
 - There is no header-based download alternative.
 
+## Uploading
+
+Documented at https://developer.productive.io/working_with_attachments.html as four steps. This
+server runs three of them per file, in `upload_attachment`:
+
+1. `POST /attachments` with `name`, `content_type`, `size` and `attachable_type`, plus the
+   parent relationship (`task` or `comment`). The response carries `aws_policy`: `key`,
+   `policy`, `success_action_status`, `Content-Type` and the `x-amz-*` signing fields.
+2. `POST https://productive-files-production.s3.eu-west-1.amazonaws.com` as multipart form
+   data: every `aws_policy` field verbatim, then the file in a field named `File`. The file must
+   come last because S3 ignores fields after it. No Productive headers go on this request; the
+   signed policy authorises it. S3 answers 201 with XML whose `<Location>` is the stored object.
+3. `PATCH /attachments/{id}` setting `temp_url` to that `<Location>` (URL-encoded as S3 returns
+   it).
+
+The docs' fourth step PATCHes the parent's `attachments` relationship. Setting the parent
+relationship in step 1 links the attachment on its own (confirmed against the live API), and it
+avoids rewriting the parent's attachment list, which under JSON:API semantics could replace it.
+
+Findings from the live API:
+
+- The record has a `url` straight after step 1, before any bytes exist. A record with a URL is
+  not proof of an upload. The only proof is downloading the file and comparing a hash;
+  `scripts/verify-upload.mjs` does exactly that.
+- The decoded `policy` carries `["content-length-range", 0, 104857600]`: 100 MB is the limit.
+  The tool rejects larger files before creating anything, and checks each policy's own range
+  again in case it changes.
+- The policy expires about an hour after the create call.
+- If any step fails, the tool deletes every record it created in that call
+  (`DELETE /attachments/{id}`).
+
 ## Security rule
 
 Token-in-URL is the official method, but the tokenised URL must never reach the model or the logs. Discovery tools return only the bare `url`. The download tool builds the tokenised URL internally, fetches server-side, and returns only a local file path or an inline image. Redact `?token=` from error logs; `client.ts` `makeRequest` logs the URL in its catch block, so keep that redaction in place.

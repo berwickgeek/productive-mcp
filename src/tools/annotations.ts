@@ -121,6 +121,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   create_time_entry: create('Log time entry'),
   create_time_entries: create('Log several time entries'),
   create_todo: create('Create todo'),
+  upload_attachment: create('Upload attachment'),
 
   // Additive or positional changes. Nothing is lost, and repeating them changes nothing.
   add_comment_reaction: set('React to comment'),

@@ -30,7 +30,7 @@ import { listTodosTool, listTodosDefinition, getTodoTool, getTodoDefinition, cre
 import { listPagesTool, listPagesDefinition, getPageTool, getPageDefinition, createPageTool, createPageDefinition, updatePageTool, updatePageDefinition, deletePageTool, deletePageDefinition, movePageTool, movePageDefinition, copyPageTool, copyPageDefinition } from './tools/pages.js';
 import { listPeopleTool, listPeopleDefinition, getPersonTool, getPersonDefinition } from './tools/people.js';
 import { listTaskDependenciesTool, listTaskDependenciesDefinition, getTaskDependencyTool, getTaskDependencyDefinition, createTaskDependencyTool, createTaskDependencyDefinition, deleteTaskDependencyTool, deleteTaskDependencyDefinition } from './tools/task-dependencies.js';
-import { getAttachmentTool, getAttachmentDefinition } from './tools/attachments.js';
+import { getAttachmentTool, getAttachmentDefinition, uploadAttachmentTool, uploadAttachmentDefinition } from './tools/attachments.js';
 import { getTaskOverviewTool, getTaskOverviewDefinition } from './tools/task-overview.js';
 
 /**
@@ -122,6 +122,7 @@ export const toolDefinitions = [
   deleteTaskDependencyDefinition,
   // Attachments
   getAttachmentDefinition,
+  uploadAttachmentDefinition,
 ];
 
 export async function createServer() {
@@ -350,6 +351,9 @@ export async function createServer() {
       // Attachments
       case 'get_attachment':
         return await getAttachmentTool(apiClient, args);
+
+      case 'upload_attachment':
+        return await uploadAttachmentTool(apiClient, args);
 
       default:
         throw new Error(`Unknown tool: ${name}`);

@@ -309,6 +309,13 @@ still works, but costs one round trip per comment and truncates bodies to 200 ch
 | `unpin_comment` | Unpin a comment by `comment_id` |
 | `add_comment_reaction` | Add a reaction. Requires `comment_id`, `reaction` (e.g. "like") |
 
+### Attachment Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_attachment` | Download attachments by `attachment_id` or `attachment_ids` (up to 25). Saves each file locally and returns its path; a single image is also returned inline |
+| `upload_attachment` | Upload local files to a task or comment. Requires `file_paths` (absolute, up to 10) and exactly one of `task_id` or `comment_id`. Optional `name` overrides the attachment name for a single file. Content type comes from the extension; files over 100 MB are rejected. If any file fails, every attachment the call created is deleted. Returns each attachment's ID, name, size and URL |
+
 ### Todo Tools
 
 | Tool | Description |

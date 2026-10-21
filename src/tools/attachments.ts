@@ -1,12 +1,15 @@
 /**
- * @fileoverview Tool for downloading Productive attachments so Claude can process them.
+ * @fileoverview Tools for downloading Productive attachments so Claude can process them, and
+ * for uploading local files onto a task or comment.
  * @module tools/attachments
  */
 
 import { z } from 'zod';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ProductiveAPIClient } from '../api/client.js';
+import { AttachmentParent, AttachmentUploadPolicy } from '../api/types.js';
 import { getConfig } from '../config/index.js';
 import { toMcpError } from '../utils/errors.js';
 
@@ -129,5 +132,257 @@ export const getAttachmentDefinition = {
     },
     // Exactly one of attachment_id / attachment_ids is required; the Zod schema enforces it.
     anyOf: [{ required: ['attachment_id'] }, { required: ['attachment_ids'] }],
+  },
+};
+
+/**
+ * Largest file Productive accepts: the `content-length-range` in every signed upload policy
+ * (104857600 bytes, confirmed against the live API). Checked before anything is created; the
+ * policy's own limit is checked again per file in case Productive changes it.
+ */
+export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+
+const MAX_UPLOAD_FILES = 10;
+
+/** Content types by lower-case extension. Anything else uploads as application/octet-stream. */
+const CONTENT_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
+  '.heic': 'image/heic',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+  '.pdf': 'application/pdf',
+  '.txt': 'text/plain',
+  '.log': 'text/plain',
+  '.md': 'text/markdown',
+  '.csv': 'text/csv',
+  '.html': 'text/html',
+  '.htm': 'text/html',
+  '.json': 'application/json',
+  '.xml': 'application/xml',
+  '.zip': 'application/zip',
+  '.eml': 'message/rfc822',
+  '.msg': 'application/vnd.ms-outlook',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+};
+
+export function contentTypeFor(filePath: string): string {
+  return CONTENT_TYPES[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+}
+
+/**
+ * The upper bound of the policy's `content-length-range` condition, or undefined when the
+ * policy cannot be read or carries no range.
+ */
+export function policySizeLimit(policy: AttachmentUploadPolicy): number | undefined {
+  try {
+    const decoded = JSON.parse(Buffer.from(policy.policy, 'base64').toString('utf8'));
+    const range = (decoded.conditions ?? []).find(
+      (c: unknown) => Array.isArray(c) && c[0] === 'content-length-range'
+    );
+    return typeof range?.[2] === 'number' ? range[2] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const uploadAttachmentSchema = z
+  .object({
+    file_paths: z
+      .array(z.string().min(1, 'File path is required'))
+      .min(1, 'Provide at least one file path')
+      .max(MAX_UPLOAD_FILES, `At most ${MAX_UPLOAD_FILES} files per call`),
+    task_id: z.string().min(1).optional(),
+    comment_id: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
+  })
+  .refine((v) => Boolean(v.task_id) !== Boolean(v.comment_id), {
+    message: 'Provide exactly one of task_id or comment_id',
+  })
+  .refine((v) => !v.name || v.file_paths.length === 1, {
+    message: 'name can only be given when uploading a single file',
+    path: ['name'],
+  });
+
+interface PreparedFile {
+  filePath: string;
+  name: string;
+  contentType: string;
+  size: number;
+}
+
+/**
+ * Check every path before anything is created in Productive, so a typo in the third path
+ * does not leave the first two uploaded.
+ */
+async function prepareFiles(filePaths: string[], nameOverride?: string): Promise<PreparedFile[]> {
+  const prepared: PreparedFile[] = [];
+  for (const filePath of filePaths) {
+    if (!path.isAbsolute(filePath)) {
+      throw new McpError(ErrorCode.InvalidParams, `File path must be absolute: ${filePath}`);
+    }
+    let stat;
+    try {
+      stat = await fs.stat(filePath);
+    } catch {
+      throw new McpError(ErrorCode.InvalidParams, `File not found: ${filePath}`);
+    }
+    if (!stat.isFile()) {
+      throw new McpError(ErrorCode.InvalidParams, `Not a file: ${filePath}`);
+    }
+    if (stat.size > MAX_ATTACHMENT_BYTES) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `File too large: ${filePath} is ${stat.size} bytes; Productive accepts up to ${MAX_ATTACHMENT_BYTES} bytes (100 MB)`
+      );
+    }
+    prepared.push({
+      filePath,
+      name: nameOverride ?? path.basename(filePath),
+      contentType: contentTypeFor(filePath),
+      size: stat.size,
+    });
+  }
+  return prepared;
+}
+
+/**
+ * Upload local files as attachments on a task or comment.
+ *
+ * Per file: create the record linked to its parent, POST the bytes to S3 with the signed
+ * policy from the create response, then record the stored location as `temp_url`. If any
+ * step fails for any file, every record this call created is deleted, so a failure never
+ * leaves an empty placeholder on the task.
+ *
+ * @param client - The Productive API client
+ * @param args - Tool arguments validated against {@link uploadAttachmentSchema}
+ */
+export async function uploadAttachmentTool(
+  client: ProductiveAPIClient,
+  args: unknown
+): Promise<ToolResult> {
+  try {
+    const params = uploadAttachmentSchema.parse(args);
+    const parent: AttachmentParent = params.task_id
+      ? { type: 'task', id: params.task_id }
+      : { type: 'comment', id: params.comment_id as string };
+
+    const files = await prepareFiles(params.file_paths, params.name);
+
+    const createdIds: string[] = [];
+    const uploaded: Array<{ id: string; name: string; size: number; url: string }> = [];
+
+    try {
+      for (const file of files) {
+        const created = await client.createAttachment(file, parent);
+        const id = created.data.id;
+        createdIds.push(id);
+
+        const policy = created.data.attributes.aws_policy;
+        if (!policy) {
+          throw new Error(`Productive returned no upload policy for ${file.name}.`);
+        }
+        const limit = policySizeLimit(policy);
+        if (limit !== undefined && file.size > limit) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            `File too large: ${file.filePath} is ${file.size} bytes; Productive accepts up to ${limit} bytes`
+          );
+        }
+
+        const data = await fs.readFile(file.filePath);
+        const location = await client.uploadAttachmentFile(policy, {
+          name: file.name,
+          contentType: file.contentType,
+          data,
+        });
+        const updated = await client.setAttachmentTempUrl(id, location);
+        const attrs = updated.data.attributes;
+        uploaded.push({ id, name: attrs.name, size: attrs.size, url: attrs.url });
+      }
+    } catch (error) {
+      const leftBehind: string[] = [];
+      for (const id of createdIds) {
+        try {
+          await client.deleteAttachment(id);
+        } catch {
+          leftBehind.push(id);
+        }
+      }
+      const cleanup =
+        createdIds.length === 0
+          ? 'Nothing was created.'
+          : leftBehind.length === 0
+            ? `Rolled back: deleted the ${createdIds.length} attachment record(s) this call created.`
+            : `Rollback incomplete: could not delete attachment record(s) ${leftBehind.join(', ')}; remove them by hand.`;
+      const mapped = toMcpError(error);
+      throw new McpError(mapped.code, `${mapped.message.replace(/^MCP error -?\d+: /, '')} ${cleanup}`);
+    }
+
+    const target = `${parent.type} ${parent.id}`;
+    const lines = uploaded.map(
+      (a) => `- ID ${a.id}: ${a.name} (${a.size} bytes)\n  URL: ${a.url}`
+    );
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Uploaded ${uploaded.length} attachment(s) to ${target}:\n${lines.join('\n')}`,
+        },
+      ],
+    };
+  } catch (error) {
+    throw toMcpError(error);
+  }
+}
+
+export const uploadAttachmentDefinition = {
+  name: 'upload_attachment',
+  description:
+    'Upload one or more local files to Productive.io as attachments on a task or a comment ' +
+    '(for example, screenshots copied from a support ticket). Pass absolute file_paths and exactly one of task_id or comment_id. ' +
+    'Content type comes from the file extension, size from disk, and the attachment name from the file name. ' +
+    'Files over 100 MB are rejected. If any file fails, every attachment created by the call is deleted again. ' +
+    'Returns the ID, name, size and URL of each attachment; download one back with get_attachment.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      file_paths: {
+        type: 'array',
+        items: { type: 'string' },
+        minItems: 1,
+        maxItems: MAX_UPLOAD_FILES,
+        description: 'Absolute paths of the local files to upload, up to 10.',
+      },
+      task_id: {
+        type: 'string',
+        description: 'The task to attach the files to. Give this or comment_id, not both.',
+      },
+      comment_id: {
+        type: 'string',
+        description: 'The comment to attach the files to. Give this or task_id, not both.',
+      },
+      name: {
+        type: 'string',
+        description: 'Attachment name to use instead of the file name. Only allowed with a single file.',
+      },
+    },
+    required: ['file_paths'],
+    // Exactly one of task_id / comment_id is required; the Zod schema enforces it.
+    anyOf: [{ required: ['task_id'] }, { required: ['comment_id'] }],
   },
 };

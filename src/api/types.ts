@@ -103,9 +103,44 @@ export interface ProductiveAttachment {
     attachable_type?: string;
     created_at?: string;
     deleted_at?: string | null;
+    /** Signed S3 form fields, returned only by the create call. See {@link AttachmentUploadPolicy}. */
+    aws_policy?: AttachmentUploadPolicy;
     [key: string]: any;
   };
   relationships?: Record<string, any>;
+}
+
+/**
+ * The form fields Productive signs for a browser-style S3 POST upload. Every field is sent
+ * back verbatim as multipart form data, followed by the file itself. `policy` is base64 JSON
+ * whose conditions include the allowed `content-length-range`.
+ */
+export interface AttachmentUploadPolicy {
+  key: string;
+  policy: string;
+  [field: string]: string;
+}
+
+/** The parent an uploaded attachment is linked to. */
+export interface AttachmentParent {
+  type: 'task' | 'comment';
+  id: string;
+}
+
+export interface ProductiveAttachmentCreate {
+  data: {
+    type: 'attachments';
+    attributes: {
+      name: string;
+      content_type: string;
+      size: number;
+      attachable_type: AttachmentParent['type'];
+    };
+    relationships: {
+      task?: { data: { type: 'tasks'; id: string } };
+      comment?: { data: { type: 'comments'; id: string } };
+    };
+  };
 }
 
 export interface ProductiveIncludedResource {
