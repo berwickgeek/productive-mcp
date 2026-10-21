@@ -17,6 +17,7 @@ import { deletePageTool, deletePageDefinition } from '../pages.js';
 import { deleteTodoTool, deleteTodoDefinition } from '../todos.js';
 import { deleteTaskDependencyTool, deleteTaskDependencyDefinition } from '../task-dependencies.js';
 import { deleteTimeEntryTool, deleteTimeEntryDefinition } from '../time-entries.js';
+import { deleteAttachmentTool, deleteAttachmentDefinition } from '../attachments.js';
 
 function mockClient(overrides: Record<string, unknown>): ProductiveAPIClient {
   return overrides as unknown as ProductiveAPIClient;
@@ -111,6 +112,23 @@ const CASES = [
     },
     expectInPreview: 'Consolidated support work on the renewals form',
   },
+  {
+    name: 'delete_attachment',
+    tool: deleteAttachmentTool,
+    definition: deleteAttachmentDefinition,
+    args: { attachment_id: '5000001' },
+    getter: 'getAttachment',
+    deleter: 'deleteAttachment',
+    record: {
+      data: {
+        id: '5000001',
+        attributes: { name: 'login-error.png', content_type: 'image/png', size: 2048, attachable_type: 'task' },
+        relationships: { task: { data: { type: 'tasks', id: '1000001' } }, comment: { data: null } },
+      },
+      included: [{ type: 'tasks', id: '1000001', attributes: { title: 'Member cannot log in' } }],
+    },
+    expectInPreview: 'login-error.png (image/png, 2048 bytes), on task 1000001 (Member cannot log in)',
+  },
 ] as const;
 
 describe.each(CASES)('$name confirmation gate', (c) => {
@@ -190,6 +208,6 @@ describe.each(CASES)('$name confirmation gate', (c) => {
     expect(c.definition.inputSchema.properties).toHaveProperty('confirm');
     expect(c.definition.description).toContain('confirm');
     // Not required, so the safe path is the default rather than something to opt into.
-    expect(c.definition.inputSchema.required).not.toContain('confirm');
+    expect((c.definition.inputSchema as { required?: string[] }).required ?? []).not.toContain('confirm');
   });
 });

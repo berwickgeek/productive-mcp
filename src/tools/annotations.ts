@@ -139,6 +139,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // Overwrites and removals. These are the ones a client should think about gating.
   archive_folder: destroy('Archive folder'),
   archive_task_list: destroy('Archive task list'),
+  delete_attachment: destroy('Delete attachment'),
   delete_comment: destroy('Delete comment'),
   delete_page: destroy('Delete page'),
   delete_task: destroy('Delete task'),

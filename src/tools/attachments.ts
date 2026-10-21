@@ -12,6 +12,7 @@ import { ProductiveAPIClient } from '../api/client.js';
 import { AttachmentParent, AttachmentUploadPolicy } from '../api/types.js';
 import { getConfig } from '../config/index.js';
 import { toMcpError } from '../utils/errors.js';
+import { confirmField, confirmProperty, deletionPreview } from '../utils/confirm.js';
 
 type ToolContent =
   | { type: 'text'; text: string }
@@ -384,5 +385,114 @@ export const uploadAttachmentDefinition = {
     required: ['file_paths'],
     // Exactly one of task_id / comment_id is required; the Zod schema enforces it.
     anyOf: [{ required: ['task_id'] }, { required: ['comment_id'] }],
+  },
+};
+
+const deleteAttachmentSchema = z
+  .object({
+    attachment_id: z.string().min(1, 'Attachment ID is required').optional(),
+    attachment_ids: z.array(z.string().min(1, 'Attachment ID is required')).min(1).max(25).optional(),
+    confirm: confirmField,
+  })
+  .refine((v) => Boolean(v.attachment_id) !== Boolean(v.attachment_ids), {
+    message: 'Provide either attachment_id or attachment_ids, not both',
+  });
+
+/**
+ * One preview line per attachment: name, type, size and the parent it hangs off, so a wrong
+ * ID shows up as the wrong file or the wrong task before anything is deleted.
+ */
+async function describeAttachment(client: ProductiveAPIClient, id: string): Promise<string> {
+  const res = await client.getAttachment(id, 'task,comment');
+  const a = res.data.attributes;
+  const rels = res.data.relationships ?? {};
+  let parent = a.attachable_type ? `a ${a.attachable_type}` : 'an unknown parent';
+  for (const kind of ['task', 'comment'] as const) {
+    const ref = rels[kind]?.data;
+    if (ref?.id) {
+      const title = res.included?.find((i) => i.type === ref.type && i.id === ref.id)?.attributes?.title;
+      parent = `${kind} ${ref.id}${title ? ` (${title})` : ''}`;
+    }
+  }
+  return `${id}: ${a.name} (${a.content_type}, ${a.size} bytes), on ${parent}`;
+}
+
+/**
+ * Delete attachments, behind the same two-step gate as every other delete tool. The first
+ * call looks each attachment up and describes it; nothing is removed until `confirm: true`.
+ *
+ * @param client - The Productive API client
+ * @param args - Tool arguments validated against {@link deleteAttachmentSchema}
+ */
+export async function deleteAttachmentTool(
+  client: ProductiveAPIClient,
+  args: unknown
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  try {
+    const params = deleteAttachmentSchema.parse(args);
+    const ids = params.attachment_ids ?? [params.attachment_id as string];
+
+    if (!params.confirm) {
+      // Every lookup runs before anything is deleted, so one bad ID in a batch fails here.
+      const details: string[] = [];
+      for (const id of ids) {
+        details.push(await describeAttachment(client, id));
+      }
+      return deletionPreview({
+        tool: 'delete_attachment',
+        kind: 'attachment',
+        id: ids.join(', '),
+        details,
+      });
+    }
+
+    if (ids.length === 1) {
+      await client.deleteAttachment(ids[0]);
+      return { content: [{ type: 'text', text: `Attachment ${ids[0]} deleted successfully.` }] };
+    }
+
+    // In a batch, one failure must not stop the rest; report each outcome.
+    const lines: string[] = [];
+    let deleted = 0;
+    for (const id of ids) {
+      try {
+        await client.deleteAttachment(id);
+        deleted += 1;
+        lines.push(`${id}: deleted`);
+      } catch (error) {
+        lines.push(`${id}: FAILED, ${toMcpError(error).message}`);
+      }
+    }
+    return {
+      content: [{ type: 'text', text: `Deleted ${deleted} of ${ids.length} attachments.\n\n${lines.join('\n')}` }],
+    };
+  } catch (error) {
+    throw toMcpError(error);
+  }
+}
+
+export const deleteAttachmentDefinition = {
+  name: 'delete_attachment',
+  description:
+    'Delete an attachment from a task or comment in Productive.io, for example one uploaded in error. ' +
+    'Call it first without confirm: it shows each attachment\'s name, size and parent and deletes nothing. ' +
+    'Then call again with the same arguments plus confirm true. To remove several, pass attachment_ids in ONE call.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      attachment_id: {
+        type: 'string',
+        description: 'The ID of a single attachment to delete.',
+      },
+      attachment_ids: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 25,
+        description: 'Delete several attachments in one call.',
+      },
+      confirm: confirmProperty,
+    },
+    // Exactly one of attachment_id / attachment_ids is required; the Zod schema enforces it.
+    anyOf: [{ required: ['attachment_id'] }, { required: ['attachment_ids'] }],
   },
 };

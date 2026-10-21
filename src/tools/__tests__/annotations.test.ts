@@ -19,6 +19,7 @@ const names = toolDefinitions.map(d => d.name);
 const DESTRUCTIVE = [
   'archive_folder',
   'archive_task_list',
+  'delete_attachment',
   'delete_comment',
   'delete_page',
   'delete_task',
@@ -43,8 +44,8 @@ describe('annotation coverage', () => {
   });
 
   it('covers the whole surface', () => {
-    expect(names.length).toBe(76);
-    expect(Object.keys(TOOL_ANNOTATIONS)).toHaveLength(76);
+    expect(names.length).toBe(77);
+    expect(Object.keys(TOOL_ANNOTATIONS)).toHaveLength(77);
   });
 
   it('gives every tool a human-readable title', () => {

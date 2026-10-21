@@ -30,7 +30,7 @@ import { listTodosTool, listTodosDefinition, getTodoTool, getTodoDefinition, cre
 import { listPagesTool, listPagesDefinition, getPageTool, getPageDefinition, createPageTool, createPageDefinition, updatePageTool, updatePageDefinition, deletePageTool, deletePageDefinition, movePageTool, movePageDefinition, copyPageTool, copyPageDefinition } from './tools/pages.js';
 import { listPeopleTool, listPeopleDefinition, getPersonTool, getPersonDefinition } from './tools/people.js';
 import { listTaskDependenciesTool, listTaskDependenciesDefinition, getTaskDependencyTool, getTaskDependencyDefinition, createTaskDependencyTool, createTaskDependencyDefinition, deleteTaskDependencyTool, deleteTaskDependencyDefinition } from './tools/task-dependencies.js';
-import { getAttachmentTool, getAttachmentDefinition, uploadAttachmentTool, uploadAttachmentDefinition } from './tools/attachments.js';
+import { getAttachmentTool, getAttachmentDefinition, uploadAttachmentTool, uploadAttachmentDefinition, deleteAttachmentTool, deleteAttachmentDefinition } from './tools/attachments.js';
 import { getTaskOverviewTool, getTaskOverviewDefinition } from './tools/task-overview.js';
 
 /**
@@ -123,6 +123,7 @@ export const toolDefinitions = [
   // Attachments
   getAttachmentDefinition,
   uploadAttachmentDefinition,
+  deleteAttachmentDefinition,
 ];
 
 export async function createServer() {
@@ -354,6 +355,9 @@ export async function createServer() {
 
       case 'upload_attachment':
         return await uploadAttachmentTool(apiClient, args);
+
+      case 'delete_attachment':
+        return await deleteAttachmentTool(apiClient, args);
 
       default:
         throw new Error(`Unknown tool: ${name}`);

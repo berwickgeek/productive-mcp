@@ -41,7 +41,7 @@ src/
 │   ├── client.ts     # ProductiveAPIClient: ALL HTTP goes through this
 │   └── types.ts      # JSON:API response shapes
 ├── tools/            # one file per domain (tasks, comments, pages, todos, ...)
-│   └── annotations.ts  # the behaviour-hint table for all 76 tools
+│   └── annotations.ts  # the behaviour-hint table for all 77 tools
 ├── utils/            # errors.ts, confirm.ts, attachments.ts, html.ts, mentions.ts
 ├── config/           # env validation
 └── prompts/

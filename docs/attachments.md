@@ -49,6 +49,13 @@ Findings from the live API:
 - If any step fails, the tool deletes every record it created in that call
   (`DELETE /attachments/{id}`).
 
+## Deleting
+
+`DELETE /attachments/{id}` removes the attachment and detaches it from its parent; a later
+`GET` returns 404. `delete_attachment` sits behind the standard `confirm` gate. Its preview
+fetches `attachments/{id}?include=task,comment` so it can name the parent task or comment,
+which is what catches a wrong ID.
+
 ## Security rule
 
 Token-in-URL is the official method, but the tokenised URL must never reach the model or the logs. Discovery tools return only the bare `url`. The download tool builds the tokenised URL internally, fetches server-side, and returns only a local file path or an inline image. Redact `?token=` from error logs; `client.ts` `makeRequest` logs the URL in its catch block, so keep that redaction in place.

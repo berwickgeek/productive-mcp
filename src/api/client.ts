@@ -1297,10 +1297,15 @@ export class ProductiveAPIClient {
    * Fetch a single attachment resource (metadata only — name, content_type, size, url).
    *
    * @param attachmentId - The ID of the attachment to retrieve
+   * @param include - Optional JSON:API `include` list, e.g. `task,comment` to name the parent
    * @returns Promise resolving to the attachment resource
    */
-  async getAttachment(attachmentId: string): Promise<ProductiveSingleResponse<ProductiveAttachment>> {
-    return this.makeRequest<ProductiveSingleResponse<ProductiveAttachment>>(`attachments/${attachmentId}`);
+  async getAttachment(
+    attachmentId: string,
+    include?: string
+  ): Promise<ProductiveSingleResponse<ProductiveAttachment>> {
+    const query = include ? `?include=${encodeURIComponent(include)}` : '';
+    return this.makeRequest<ProductiveSingleResponse<ProductiveAttachment>>(`attachments/${attachmentId}${query}`);
   }
 
   /**

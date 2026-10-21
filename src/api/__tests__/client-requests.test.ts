@@ -376,6 +376,19 @@ describe('attachment upload requests', () => {
     });
   });
 
+  it('includes the parent when asked, and nothing when not', async () => {
+    const spy = stubFetch();
+    const client = new ProductiveAPIClient(config);
+
+    await client.getAttachment('1000001', 'task,comment');
+    await client.getAttachment('1000002');
+
+    const withInclude = new URL(spy.mock.calls[0][0] as string);
+    expect(withInclude.pathname).toBe('/attachments/1000001');
+    expect(withInclude.searchParams.get('include')).toBe('task,comment');
+    expect(new URL(spy.mock.calls[1][0] as string).search).toBe('');
+  });
+
   it('deletes an attachment by id', async () => {
     const spy = stubFetch();
 

@@ -315,6 +315,7 @@ still works, but costs one round trip per comment and truncates bodies to 200 ch
 |------|-------------|
 | `get_attachment` | Download attachments by `attachment_id` or `attachment_ids` (up to 25). Saves each file locally and returns its path; a single image is also returned inline |
 | `upload_attachment` | Upload local files to a task or comment. Requires `file_paths` (absolute, up to 10) and exactly one of `task_id` or `comment_id`. Optional `name` overrides the attachment name for a single file. Content type comes from the extension; files over 100 MB are rejected. If any file fails, every attachment the call created is deleted. Returns each attachment's ID, name, size and URL |
+| `delete_attachment` | Delete attachments by `attachment_id` or `attachment_ids` (up to 25). The first call previews each attachment's name, size and parent task or comment and deletes nothing; call again with `confirm: true` to delete |
 
 ### Todo Tools
 
