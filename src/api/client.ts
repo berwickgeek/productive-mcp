@@ -36,8 +36,17 @@ import {
   ProductiveTaskDependency,
   ProductiveTaskDependencyCreate,
   ProductiveAttachment,
+  ProductiveAttachmentCreate,
+  AttachmentParent,
+  AttachmentUploadPolicy,
   ProductiveError
 } from './types.js';
+
+/**
+ * Where Productive's signed upload policies point. The create response carries the form
+ * fields but not the URL, so this is the host from the developer docs.
+ */
+export const ATTACHMENT_UPLOAD_URL = 'https://productive-files-production.s3.eu-west-1.amazonaws.com';
 
 /** Replaces any `token` query-parameter value with a redaction marker so secrets never reach logs. */
 function redactToken(text: string): string {
@@ -1288,10 +1297,15 @@ export class ProductiveAPIClient {
    * Fetch a single attachment resource (metadata only — name, content_type, size, url).
    *
    * @param attachmentId - The ID of the attachment to retrieve
+   * @param include - Optional JSON:API `include` list, e.g. `task,comment` to name the parent
    * @returns Promise resolving to the attachment resource
    */
-  async getAttachment(attachmentId: string): Promise<ProductiveSingleResponse<ProductiveAttachment>> {
-    return this.makeRequest<ProductiveSingleResponse<ProductiveAttachment>>(`attachments/${attachmentId}`);
+  async getAttachment(
+    attachmentId: string,
+    include?: string
+  ): Promise<ProductiveSingleResponse<ProductiveAttachment>> {
+    const query = include ? `?include=${encodeURIComponent(include)}` : '';
+    return this.makeRequest<ProductiveSingleResponse<ProductiveAttachment>>(`attachments/${attachmentId}${query}`);
   }
 
   /**
@@ -1338,5 +1352,100 @@ export class ProductiveAPIClient {
       size: attrs.size,
       data: Buffer.from(arrayBuffer),
     };
+  }
+
+  /**
+   * Step 1 of an upload: create the attachment record, already linked to its parent.
+   *
+   * The documented flow links the parent in a fourth step by PATCHing the parent's
+   * `attachments` relationship. Setting the relationship here does the same job without
+   * rewriting the parent's attachment list (confirmed against the live API).
+   *
+   * @returns The new record, whose `aws_policy` attribute carries the signed upload fields
+   */
+  async createAttachment(
+    file: { name: string; contentType: string; size: number },
+    parent: AttachmentParent
+  ): Promise<ProductiveSingleResponse<ProductiveAttachment>> {
+    const relationships: ProductiveAttachmentCreate['data']['relationships'] =
+      parent.type === 'task'
+        ? { task: { data: { type: 'tasks', id: parent.id } } }
+        : { comment: { data: { type: 'comments', id: parent.id } } };
+
+    const body: ProductiveAttachmentCreate = {
+      data: {
+        type: 'attachments',
+        attributes: {
+          name: file.name,
+          content_type: file.contentType,
+          size: file.size,
+          attachable_type: parent.type,
+        },
+        relationships,
+      },
+    };
+
+    return this.makeRequest<ProductiveSingleResponse<ProductiveAttachment>>('attachments', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  /**
+   * Step 2 of an upload: send the bytes to S3 as a form POST signed by Productive.
+   *
+   * No Productive credentials go on this request. The signed policy is the authorisation,
+   * and S3 rejects unexpected fields.
+   *
+   * @returns The stored object's URL from the `<Location>` element of S3's response
+   */
+  async uploadAttachmentFile(
+    policy: AttachmentUploadPolicy,
+    file: { name: string; contentType: string; data: Buffer }
+  ): Promise<string> {
+    const form = new FormData();
+    for (const [field, value] of Object.entries(policy)) {
+      form.append(field, value);
+    }
+    // S3 ignores every field after the file, so it must be appended last.
+    form.append('File', new Blob([file.data], { type: file.contentType }), file.name);
+
+    const response = await fetch(ATTACHMENT_UPLOAD_URL, { method: 'POST', body: form });
+    const xml = await response.text();
+
+    if (!response.ok) {
+      const code = /<Code>([^<]*)<\/Code>/.exec(xml)?.[1];
+      const message = /<Message>([^<]*)<\/Message>/.exec(xml)?.[1];
+      const detail = [code, message].filter(Boolean).join(': ');
+      throw new Error(
+        `Upload of ${file.name} to storage failed: ${response.status}${detail ? ` (${detail})` : ''}`
+      );
+    }
+
+    const location = /<Location>([^<]+)<\/Location>/.exec(xml)?.[1];
+    if (!location) {
+      throw new Error(`Upload of ${file.name} succeeded but storage returned no Location.`);
+    }
+    return location.replace(/&amp;/g, '&');
+  }
+
+  /**
+   * Step 3 of an upload: record where the bytes landed. Until this is set the record has no
+   * content behind its `url`.
+   */
+  async setAttachmentTempUrl(
+    attachmentId: string,
+    tempUrl: string
+  ): Promise<ProductiveSingleResponse<ProductiveAttachment>> {
+    return this.makeRequest<ProductiveSingleResponse<ProductiveAttachment>>(`attachments/${attachmentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        data: { type: 'attachments', id: attachmentId, attributes: { temp_url: tempUrl } },
+      }),
+    });
+  }
+
+  async deleteAttachment(attachmentId: string): Promise<void> {
+    return this.makeVoidRequest(`attachments/${attachmentId}`, { method: 'DELETE' });
   }
 }

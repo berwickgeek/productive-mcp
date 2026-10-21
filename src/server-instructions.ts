@@ -65,6 +65,7 @@ export function buildInstructions(userId?: string): string {
     'FEWER ROUND TRIPS',
     'Several known task IDs: one list_tasks with task_ids, not get_task per ID.',
     'Several attachments: one get_attachment with attachment_ids, not one call each.',
+    'Several files to attach: one upload_attachment with all file_paths, not one call each.',
     'Replying and handing a task back: add_task_comment with assignee_id, not a follow-up',
     'update_task_assignment.',
     'A batch of timesheet entries: one create_time_entries, not create_time_entry per row.',

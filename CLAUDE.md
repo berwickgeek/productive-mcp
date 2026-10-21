@@ -23,6 +23,7 @@ npm run type-check    # tsc --noEmit
 npm run build         # tsc + chmod, emits build/
 npm run dev           # tsc --watch
 node scripts/smoke-test.mjs   # start the built server, assert the surface it serves
+node scripts/verify-upload.mjs <task_id> <file>...  # live upload round trip, compares SHA-256 (writes to Productive)
 ```
 
 CI runs type-check, test, build and the smoke test on Node 20 and 22, plus a Node 18 job that
@@ -40,7 +41,7 @@ src/
 │   ├── client.ts     # ProductiveAPIClient: ALL HTTP goes through this
 │   └── types.ts      # JSON:API response shapes
 ├── tools/            # one file per domain (tasks, comments, pages, todos, ...)
-│   └── annotations.ts  # the behaviour-hint table for all 75 tools
+│   └── annotations.ts  # the behaviour-hint table for all 77 tools
 ├── utils/            # errors.ts, confirm.ts, attachments.ts, html.ts, mentions.ts
 ├── config/           # env validation
 └── prompts/

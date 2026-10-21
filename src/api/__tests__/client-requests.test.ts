@@ -284,3 +284,117 @@ describe('request headers', () => {
     expect(headers['Content-Type']).toBe('application/vnd.api+json');
   });
 });
+
+describe('attachment upload requests', () => {
+  it('creates the record linked to its task, with the attachable_type to match', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).createAttachment(
+      { name: 'shot.png', contentType: 'image/png', size: 4321 },
+      { type: 'task', id: '2000001' }
+    );
+
+    expect(urlOf(spy).pathname).toBe('/attachments');
+    const init = spy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      data: {
+        type: 'attachments',
+        attributes: { name: 'shot.png', content_type: 'image/png', size: 4321, attachable_type: 'task' },
+        relationships: { task: { data: { type: 'tasks', id: '2000001' } } },
+      },
+    });
+  });
+
+  it('links a comment parent through the comment relationship', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).createAttachment(
+      { name: 'shot.png', contentType: 'image/png', size: 1 },
+      { type: 'comment', id: '3000001' }
+    );
+
+    const body = JSON.parse((spy.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.data.attributes.attachable_type).toBe('comment');
+    expect(body.data.relationships).toEqual({ comment: { data: { type: 'comments', id: '3000001' } } });
+  });
+
+  it('posts every policy field then the file to S3, without Productive credentials', async () => {
+    const spy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      text: async () =>
+        '<?xml version="1.0"?><PostResponse><Location>https://bucket.example.com/attachments%2Fa%2Fshot.png?x=1&amp;y=2</Location></PostResponse>',
+    });
+    vi.stubGlobal('fetch', spy);
+    const data = Buffer.from('fake-png-bytes');
+
+    const location = await new ProductiveAPIClient(config).uploadAttachmentFile(
+      { key: 'attachments/a/shot.png', policy: 'cG9saWN5', 'x-amz-signature': 'sig', 'Content-Type': 'image/png' },
+      { name: 'shot.png', contentType: 'image/png', data }
+    );
+
+    expect(spy.mock.calls[0][0]).toBe('https://productive-files-production.s3.eu-west-1.amazonaws.com');
+    const init = spy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(init.headers).toBeUndefined();
+    const form = init.body as FormData;
+    const fields = [...form.keys()];
+    expect(fields).toEqual(['key', 'policy', 'x-amz-signature', 'Content-Type', 'File']);
+    expect(form.get('key')).toBe('attachments/a/shot.png');
+    const file = form.get('File') as File;
+    expect(file.name).toBe('shot.png');
+    expect(Buffer.from(await file.arrayBuffer()).equals(data)).toBe(true);
+    // The Location is passed on as S3 wrote it, with only the XML entity decoded.
+    expect(location).toBe('https://bucket.example.com/attachments%2Fa%2Fshot.png?x=1&y=2');
+  });
+
+  it('reports the S3 error code when storage rejects the upload', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: async () => '<Error><Code>AccessDenied</Code><Message>Policy expired</Message></Error>',
+    }));
+
+    await expect(
+      new ProductiveAPIClient(config).uploadAttachmentFile({ key: 'k', policy: 'p' }, {
+        name: 'shot.png', contentType: 'image/png', data: Buffer.from('x'),
+      })
+    ).rejects.toThrow('Upload of shot.png to storage failed: 403 (AccessDenied: Policy expired)');
+  });
+
+  it('patches temp_url onto the attachment', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).setAttachmentTempUrl('1000001', 'https://bucket.example.com/a.png');
+
+    expect(urlOf(spy).pathname).toBe('/attachments/1000001');
+    const init = spy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({
+      data: { type: 'attachments', id: '1000001', attributes: { temp_url: 'https://bucket.example.com/a.png' } },
+    });
+  });
+
+  it('includes the parent when asked, and nothing when not', async () => {
+    const spy = stubFetch();
+    const client = new ProductiveAPIClient(config);
+
+    await client.getAttachment('1000001', 'task,comment');
+    await client.getAttachment('1000002');
+
+    const withInclude = new URL(spy.mock.calls[0][0] as string);
+    expect(withInclude.pathname).toBe('/attachments/1000001');
+    expect(withInclude.searchParams.get('include')).toBe('task,comment');
+    expect(new URL(spy.mock.calls[1][0] as string).search).toBe('');
+  });
+
+  it('deletes an attachment by id', async () => {
+    const spy = stubFetch();
+
+    await new ProductiveAPIClient(config).deleteAttachment('1000001');
+
+    expect(urlOf(spy).pathname).toBe('/attachments/1000001');
+    expect((spy.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
+  });
+});

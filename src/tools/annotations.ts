@@ -121,6 +121,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   create_time_entry: create('Log time entry'),
   create_time_entries: create('Log several time entries'),
   create_todo: create('Create todo'),
+  upload_attachment: create('Upload attachment'),
 
   // Additive or positional changes. Nothing is lost, and repeating them changes nothing.
   add_comment_reaction: set('React to comment'),
@@ -138,6 +139,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // Overwrites and removals. These are the ones a client should think about gating.
   archive_folder: destroy('Archive folder'),
   archive_task_list: destroy('Archive task list'),
+  delete_attachment: destroy('Delete attachment'),
   delete_comment: destroy('Delete comment'),
   delete_page: destroy('Delete page'),
   delete_task: destroy('Delete task'),

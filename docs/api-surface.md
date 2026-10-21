@@ -31,7 +31,7 @@ Reference notes on the upstream API this server wraps. Docs: https://developer.p
 - Financial: invoices (finalize, send, export), line_items (bulk generate), invoice_templates, invoice_attributions, payments, payment_reminder_sequences, expenses (approve, export, copy), bills, purchase_orders, tax_rates, bank_accounts, exchange_rates
 - Deals and budgets: deals (one endpoint for both, distinguished by the `budget` boolean), deal_statuses, deal_cost_rates, contracts (recurring budgets with a generate action), lost_reasons, services, service_types, pipelines, prices
 - People and organisation: people (invite, deactivate, archive, merge), users, companies, teams, team_memberships, memberships (access control), organization_memberships, subsidiaries, permission_sets, placeholders
-- Documents: pages (move, copy), page_versions, document_types, document_styles, custom_domains, attachments (S3 presigned upload; see `attachments.md`)
+- Documents: pages (move, copy), page_versions, document_types, document_styles, custom_domains, attachments (signed S3 form upload; see `attachments.md`)
 - Absences: events (absence categories), entitlements, holiday_calendars, holidays
 - Approvals: approval_policies, approval_policy_assignments, approval_workflows
 - Collaboration: activities (audit log), comments (pin, react), discussions, emails, notifications, todos
@@ -58,6 +58,6 @@ Reference notes on the upstream API this server wraps. Docs: https://developer.p
 
 ## Coverage in this server
 
-The authoritative tool inventory is `src/tools/annotations.ts` (72 tools at the time of writing). As of 2026-09-10 the server covers projects, companies, people, folders, task lists, tasks (including subtasks, dependencies, reposition, sprint, backlog), comments (including reactions and pinning), pages, todos, time entries (list, create, update, delete), services and deals, workflows, activities, and attachment reads.
+The authoritative tool inventory is `src/tools/annotations.ts` (72 tools at the time of writing). As of 2026-09-10 the server covers projects, companies, people, folders, task lists, tasks (including subtasks, dependencies, reposition, sprint, backlog), comments (including reactions and pinning), pages, todos, time entries (list, create, update, delete), services and deals, workflows, activities, and attachments (download and upload).
 
 Still absent, as API families: invoices and all financial endpoints, bookings and resource planning, absences, approvals, reports, custom fields, webhooks, contracts, proposals, surveys, dashboards, notifications, teams.
